@@ -1382,7 +1382,7 @@ MPU9250_Sensor::MPU9250_Sensor(uint8_t config_data[SENSORS_MAX_SETTINGS_A]) {
   settings.accel_fs_sel = ACCEL_FS_SEL::A2G;
   settings.gyro_fs_sel = GYRO_FS_SEL::G500DPS;
   
-  auto i = this->sensor.setup(0x68, settings, config_data[0]);
+  auto i = this->sensor.setup(config_data[1], settings, config_data[0]);
   if (!i) {
     this->enabled = false;
   }
