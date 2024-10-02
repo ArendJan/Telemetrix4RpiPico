@@ -1375,9 +1375,14 @@ void VL53L0X_Sensor::readSensor() {
   this->writeSensorData(data);
 }
 
-MPU9250_Sensor::MPU9250_Sensor(uint8_t settings[SENSORS_MAX_SETTINGS_A]) {
-  this->sensor.bus = settings[0];
-  auto i = this->sensor.setup(0x68, MPU9250Setting(), settings[0]);
+MPU9250_Sensor::MPU9250_Sensor(uint8_t config_data[SENSORS_MAX_SETTINGS_A]) {
+  this->sensor.bus = config_data[0];
+  auto settings = MPU9250Setting();
+
+  settings.accel_fs_sel = ACCEL_FS_SEL::A2G;
+  settings.gyro_fs_sel = GYRO_FS_SEL::G500DPS;
+  
+  auto i = this->sensor.setup(0x68, settings, config_data[0]);
   if (!i) {
     this->enabled = false;
   }
