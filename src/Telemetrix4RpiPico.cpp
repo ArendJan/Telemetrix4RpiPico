@@ -1402,6 +1402,13 @@ void MPU9250_Sensor::readSensor() {
     for (int i = 0; i < 3; i++) {
       float_data.push_back(this->sensor.getMag(i));
     }
+
+    // Read out quaternion estimation
+    float_data.push_back(this->sensor.getQuaternionX());
+    float_data.push_back(this->sensor.getQuaternionY());
+    float_data.push_back(this->sensor.getQuaternionZ());
+    float_data.push_back(this->sensor.getQuaternionW());
+
     const unsigned char *bytes =
         reinterpret_cast<const uint8_t *>(&float_data[0]);
     static_assert(sizeof(float) == 4);
