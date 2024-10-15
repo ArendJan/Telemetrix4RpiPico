@@ -124,6 +124,9 @@ extern volatile bool uart_enabled;
 #define UART_TX_PIN 0
 #define UART_RX_PIN 1
 
+// Resets all hardware devices
+void reset_hardware();
+
 /*********************************************************
  *                       COMMAND DEFINES
  ********************************************************/
