@@ -1,7 +1,6 @@
 #include "Telemetrix4RpiPico.hpp"
 #include "pico/stdio.h"
 
-
 /*************************************************
  * Write data to serial interface
  * @param buffer

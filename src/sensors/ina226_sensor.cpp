@@ -1,5 +1,7 @@
 #include "sensors/ina226_sensor.hpp"
+
 #include "pico/time.h"
+
 #include "Telemetrix4RpiPico.hpp"
 
 INA226_Sensor::INA226_Sensor(uint8_t sensor_data[SENSORS_MAX_SETTINGS_A]) {

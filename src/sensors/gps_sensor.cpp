@@ -1,5 +1,6 @@
-#include "hardware/gpio.h"
 #include "sensors/gps_sensor.hpp"
+
+#include "hardware/gpio.h"
 
 GPS_Sensor::GPS_Sensor(uint8_t settings[SENSORS_MAX_SETTINGS_A]) {
   auto rx = settings[0];

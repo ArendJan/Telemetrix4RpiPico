@@ -41,5 +41,3 @@ void HMC5883L_Sensor::readSensor() {
   }
   this->writeSensorData(data);
 }
-
-

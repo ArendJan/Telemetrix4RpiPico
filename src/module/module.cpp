@@ -1,6 +1,7 @@
-#include "message_types.hpp"
 #include "module/module.hpp"
-#include "Telemetrix4RpiPico.hpp"
+
+#include "message_types.hpp"
+#include "uart.hpp"
 
 void Module::publishData(const std::vector<uint8_t> &data) {
   std::vector<uint8_t> out = {

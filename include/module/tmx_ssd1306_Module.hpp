@@ -12,7 +12,12 @@ public:
   void writeModule(std::vector<uint8_t> &data);
   void resetModule();
   void updModule();
-  enum MessageType: uint8_t { TEXT = 0, TEXT_DONE = 1, BINARY = 2, BINARY_DONE = 3 };
+  enum MessageType : uint8_t {
+    TEXT = 0,
+    TEXT_DONE = 1,
+    BINARY = 2,
+    BINARY_DONE = 3
+  };
   pico_ssd1306::SSD1306 *display;
   TmxSSD1306(std::vector<uint8_t> &data);
   FrameBuffer frameBuffer;

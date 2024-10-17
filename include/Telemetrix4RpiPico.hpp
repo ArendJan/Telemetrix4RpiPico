@@ -2,12 +2,12 @@
 // Created by afy on 3/3/21.
 //
 #pragma once
-
-#include "module/module.hpp"
-#include "sensors/sensor.hpp"
 #include "Telemetrix4RpiPico.pio.h"
 #include "message_types.hpp"
 #include "uart.hpp"
+
+#include "module/module.hpp"
+#include "sensors/sensor.hpp"
 
 #include "hardware/adc.h"
 #include "hardware/clocks.h"

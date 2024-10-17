@@ -1,7 +1,8 @@
-#include "hardware/clocks.h"
-#include "i2c_helpers.hpp"
-
 #include "module/PCA9685_Module.hpp"
+
+#include "hardware/clocks.h"
+
+#include "i2c_helpers.hpp"
 
 PCA9685_Module::PCA9685_Module(std::vector<uint8_t> &data) {
   // init pca
@@ -68,4 +69,3 @@ void PCA9685_Module::writeModule(std::vector<uint8_t> &data) {
     }
   }
 }
-

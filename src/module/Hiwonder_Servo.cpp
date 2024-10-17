@@ -1,8 +1,8 @@
 #include "module/Hiwonder_Servo.hpp"
 
 #include "message_types.hpp"
-#include "Telemetrix4RpiPico.hpp"
 
+#include "Telemetrix4RpiPico.hpp"
 
 /**
  * When creating a servo chain:
@@ -83,7 +83,6 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
         this->writeSingle(data, i, false);
       }
       this->bus->move_sync_start();
-
     }
     // TODO: Add Ok Send?
   } else if (msg_type == 2) { // enable msg
