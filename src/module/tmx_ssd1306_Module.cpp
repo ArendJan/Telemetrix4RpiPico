@@ -1,8 +1,11 @@
-#include "tmx_ssd1306.hpp"
+#include "hardware/i2c.h"
+
+#include "module/tmx_ssd1306_Module.hpp"
 
 void TmxSSD1306::readModule() {
   // This is a dummy function, as the SSD1306 does not have any data to read
 }
+
 void TmxSSD1306::updModule() {
   if (this->isWriting) {
     // update the oled a line every loop
@@ -56,6 +59,7 @@ void TmxSSD1306::writeModule(std::vector<uint8_t> &data) {
     this->currentLen = 1;
   }
 }
+
 TmxSSD1306::TmxSSD1306(std::vector<uint8_t> &data) {
   if (data.size() == 0) {
     return;
@@ -74,7 +78,6 @@ TmxSSD1306::TmxSSD1306(std::vector<uint8_t> &data) {
 
   this->text_buff.reserve(150);
 }
-extern void led_debug(int blinks, uint delay);
 
 void TmxSSD1306::resetModule() {
   if (!this->display->enabled) {

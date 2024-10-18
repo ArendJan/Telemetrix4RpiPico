@@ -14,7 +14,7 @@
  *
  ******************************************************************/
 
-#include "INA226v2.hpp"
+#include "drivers/INA226v2.hpp"
 #include "hardware/clocks.h"
 #include "i2c_helpers.hpp"
 bool INA226_WE::init() {

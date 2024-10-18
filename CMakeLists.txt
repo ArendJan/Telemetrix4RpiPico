@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.12)
 set(CMAKE_CXX_STANDARD 20)
 
+# set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
+
 set(PICO_SDK_FETCH_FROM_GIT on)
 include(pico_sdk_import.cmake)
 if(CMAKE_EXPORT_COMPILE_COMMANDS)
@@ -13,14 +15,27 @@ pico_sdk_init()
 add_executable(
   Telemetrix4RpiPico
   src/Telemetrix4RpiPico.cpp
-  src/VL53L0.cpp
   src/i2c_helpers.cpp
-  src/HX711.cpp
-  src/neopixel.cpp
-  src/INA226v2.cpp
-  src/HiwonderServo.cpp
-  src/HMC5883L.cpp
-  src/tmx_ssd1306.cpp)
+  src/uart.cpp
+  src/drivers/HMC5883L.cpp
+  src/drivers/HX711.cpp
+  src/drivers/HiwonderServo.cpp
+  src/drivers/INA226v2.cpp
+  src/drivers/VL53L0.cpp
+  src/drivers/neopixel.cpp
+  src/module/Hiwonder_Servo.cpp
+  src/module/PCA9685_Module.cpp
+  src/module/module.cpp
+  src/module/tmx_ssd1306_Module.cpp
+  src/sensors/adxl345_sensor.cpp
+  src/sensors/gps_sensor.cpp
+  src/sensors/hmc5883l_sensor.cpp
+  src/sensors/hx711_sensor.cpp
+  src/sensors/ina226_sensor.cpp
+  src/sensors/mpu9250_sensor.cpp
+  src/sensors/sensor.cpp
+  src/sensors/veml6040_sensor.cpp
+  src/sensors/vl53l0x_sensor.cpp)
 find_package(Git REQUIRED)
 execute_process(
   COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD

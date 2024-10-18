@@ -7,7 +7,7 @@
  * (c) 2018 Bogdan Necula
  *
  **/
-#include "HX711.hpp"
+#include "drivers/HX711.hpp"
 
 #include <hardware/clocks.h>
 #include <hardware/gpio.h>

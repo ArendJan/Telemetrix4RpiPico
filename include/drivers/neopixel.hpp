@@ -17,10 +17,10 @@ class TMX_NeoPixel {
 public:
   void init(int LED_count, int LED_pin, int RED_fill, int GREEN_fill,
             int BLUE_fill);
-  void setPixelColor(int pixel, int RED, int GREEN, int BLUE, bool show = true);
+  void setPixelColor(int pixel, int red, int green, int blue, bool show = true);
   void show();
   void clear();
-  void fill(int RED, int GREEN, int BLUE, bool show);
+  void fill(int red, int green, int blue, bool show);
 
 private:
   int LED_count;
