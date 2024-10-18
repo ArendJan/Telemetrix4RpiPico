@@ -1,6 +1,6 @@
 // Modified code from https://github.com/madhephaestus/lx16a-servo
 
-#include "HiwonderServo.hpp"
+#include "drivers/HiwonderServo.hpp"
 #include "i2c_helpers.hpp"
 #include "pico/stdlib.h"
 #include <stdio.h>

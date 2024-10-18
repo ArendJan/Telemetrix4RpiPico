@@ -1,4 +1,4 @@
-#include <neopixel.hpp>
+#include <drivers/neopixel.hpp>
 static unsigned int WS2812_sm = 0;
 
 #define DMA_CHANNEL (0)
@@ -38,12 +38,12 @@ static inline uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b) {
          << 8u;
 }
 
-void TMX_NeoPixel::setPixelColor(int pixel, int RED, int GREEN, int BLUE,
+void TMX_NeoPixel::setPixelColor(int pixel, int red, int green, int blue,
                                  bool show) {
   if (pixel < 0 || pixel >= this->LED_count) {
     return;
   }
-  this->pixels[pixel] = urgb_u32(RED, GREEN, BLUE);
+  this->pixels[pixel] = urgb_u32(red, green, blue);
   if (show) {
     this->show();
   }
@@ -60,9 +60,9 @@ void TMX_NeoPixel::clear() {
   this->show();
 }
 
-void TMX_NeoPixel::fill(int RED, int GREEN, int BLUE, bool show) {
+void TMX_NeoPixel::fill(int red, int green, int blue, bool show) {
   for (int i = 0; i < this->LED_count; i++) {
-    this->setPixelColor(i, RED, GREEN, BLUE, false);
+    this->setPixelColor(i, red, green, blue, false);
   }
   if (show) {
     this->show();

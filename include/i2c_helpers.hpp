@@ -1,14 +1,13 @@
 
 #pragma once
-
-#include <stdint.h>
-// #include <vector>
-#include "hardware/i2c.h"
 #include <array>
 #include <cstddef>
 #include <deque>
+#include <stdint.h>
 #include <utility>
 #include <vector>
+
+#include "hardware/i2c.h"
 
 template <typename T>
 int write_i2c_t(int i2c_port, int addr, const T &bytes, bool nostop = false) {

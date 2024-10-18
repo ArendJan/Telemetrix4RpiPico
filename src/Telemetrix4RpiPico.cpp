@@ -27,6 +27,20 @@
  *https://github.com/raspberrypi/pico-examples/tree/master/gpio/dht_sensor
  *
  *************************************************************************/
+#include "module/Hiwonder_Servo.hpp"
+#include "module/PCA9685_Module.hpp"
+#include "module/tmx_ssd1306_Module.hpp"
+
+#include "sensors/adxl345_sensor.hpp"
+#include "sensors/gps_sensor.hpp"
+#include "sensors/hmc5883l_sensor.hpp"
+#include "sensors/hx711_sensor.hpp"
+#include "sensors/ina226_sensor.hpp"
+#include "sensors/mpu9250_sensor.hpp"
+#include "sensors/veml6040_sensor.hpp"
+#include "sensors/vl53l0x_sensor.hpp"
+
+#include "drivers/neopixel.hpp"
 
 #include "Telemetrix4RpiPico.hpp"
 /*******************************************************************
@@ -62,6 +76,10 @@ int dht_count = -1;
 
 // dht device descriptors
 dht_data the_dhts = {.next_dht_index = 0, .dhts = {}};
+
+// encoder device descriptors
+encoder_data encoders = {
+    .next_encoder_index = 0, .trigger_timer = {}, .encoders = {}, .mutex = {}};
 
 // // pio for neopixel values
 // PIO np_pio = pio0;
@@ -648,6 +666,8 @@ void init_single_encoder(int A, encoder_t *enc) {
   enc->A = A;
   enc->type = SINGLE;
 }
+
+// TODO: Figure out and rename: Magic x something todo with encoders;
 int x = 0;
 
 bool encoder_callback(repeating_timer_t *timer) {
@@ -1259,314 +1279,6 @@ void readSensors() {
   }
 }
 
-GPS_Sensor::GPS_Sensor(uint8_t settings[SENSORS_MAX_SETTINGS_A]) {
-  auto rx = settings[0];
-  // auto tx = settings[1];
-  auto uart = settings[2];
-  this->uart_id = uart0;
-  if (uart) {
-    this->uart_id = uart1;
-  }
-
-  const auto DATA_BITS = 8;
-  const auto STOP_BITS = 1;
-  const auto PARITY = UART_PARITY_NONE;
-
-  uart_init(uart_id, 9600);
-  // gpio_set_function(tx, GPIO_FUNC_UART); // No need to send anything to the
-  // GPS receiver
-  gpio_set_function(rx, GPIO_FUNC_UART);
-  uart_set_hw_flow(uart_id, false, false);
-  // Set our data format
-  uart_set_fifo_enabled(uart_id, true);
-
-  uart_set_format(uart_id, DATA_BITS, STOP_BITS, PARITY);
-}
-
-void GPS_Sensor::readSensor() {
-  // Is this fast enough? fifo is 32 bytes long, unknown speed of gps module
-  // baud = 9600 -> max ~960 bytes/s. Sensor interval is 50-100Hz -> 1500-3200
-  // bytes/s, is okay.
-
-  std::vector<uint8_t> data;
-  if (uart_is_readable(this->uart_id)) {
-    while (uart_is_readable(this->uart_id)) {
-      data.push_back(uart_getc(this->uart_id));
-    }
-    this->writeSensorData(data);
-  }
-}
-
-ADXL345_Sensor::ADXL345_Sensor(uint8_t settings[SENSORS_MAX_SETTINGS_A]) {
-  // assume i2c is done
-  this->i2c_port = settings[0];
-  this->init_sequence();
-}
-void ADXL345_Sensor::init_sequence() {
-  // write 83, 43, 0
-  bool ok = write_i2c(this->i2c_port, this->i2c_addr, {43, 0});
-  // write 83, 45, 8
-  ok &= write_i2c(this->i2c_port, this->i2c_addr, {45, 8});
-  // write 83, 49, 8
-  ok &= write_i2c(this->i2c_port, this->i2c_addr, {49, 8});
-  if (!ok) {
-    this->stop = true;
-  }
-}
-void ADXL345_Sensor::readSensor() {
-  if (this->stop) {
-    return;
-  }
-  // read 83, 50, 6bytes
-  std::vector<uint8_t> out(6);
-  this->stop = !read_i2c(this->i2c_port, this->i2c_addr, {50}, 6, out);
-
-  this->writeSensorData(out);
-}
-
-VEML6040_Sensor::VEML6040_Sensor(uint8_t settings[SENSORS_MAX_SETTINGS_A]) {
-  this->i2c_port = settings[0];
-  this->init_sequence();
-}
-
-void VEML6040_Sensor::init_sequence() {
-  bool ok = write_i2c(this->i2c_port, this->i2c_addr,
-                      {
-                          0, // register 0
-                          // 0b000 << 4 |   // timing 40ms
-                          //     0b0 << 2 | // no trigger
-                          //     0b0 << 1 | // auto mode
-                          //     0b0,       // enable sensor
-                          // 0b0            // reserved H byte
-                          0x21 // 0x21 = 0b0010'0001, 100 time, stop bit
-                      });
-  sleep_ms(10);
-  ok &= write_i2c(this->i2c_port, this->i2c_addr,
-                  {
-                      0, // register 0
-                      // 0b000 << 4 |   // timing 40ms
-                      //     0b0 << 2 | // no trigger
-                      //     0b0 << 1 | // auto mode
-                      //     0b0,       // enable sensor
-                      // 0b0            // reserved H byte
-                      0x20 // 0x20 = 0b0010'0000, 100 time, no stop bit
-                  });
-  if (!ok) {
-    this->stop = true;
-  }
-}
-
-void VEML6040_Sensor::readSensor() {
-  if (this->stop) {
-    return;
-  }
-  std::vector<uint8_t> data;
-  data.reserve(8);
-  std::vector<uint8_t> single_color_data(2);
-  bool ok = true;
-  for (uint8_t reg = 0x08; reg <= 0x0B;
-       reg++) { // read the 4 registers and add the data to the full data vector
-    ok &= read_i2c(this->i2c_port, this->i2c_addr, {reg}, 2, single_color_data);
-    data.push_back(single_color_data[0]);
-    data.push_back(single_color_data[1]);
-  }
-
-  this->writeSensorData(data);
-  if (!ok) {
-    this->stop = true;
-  }
-}
-VL53L0X_Sensor::VL53L0X_Sensor(uint8_t settings[SENSORS_MAX_SETTINGS_A]) {
-  this->sensor.setBus(settings[0]);
-  bool ok = this->sensor.init();
-  // this->sensor.setTimeout(1);
-  if (!ok) {
-    this->stop = true;
-    return;
-  }
-  this->sensor.startContinuous();
-}
-
-void VL53L0X_Sensor::readSensor() {
-  auto dist = this->sensor.readRangeContinuousMillimeters();
-  std::vector<uint8_t> data = {(uint8_t)(dist >> 8), (uint8_t)(dist & 0xFF)};
-  this->writeSensorData(data);
-}
-
-MPU9250_Sensor::MPU9250_Sensor(uint8_t config_data[SENSORS_MAX_SETTINGS_A]) {
-  this->sensor.bus = config_data[0];
-  auto settings = MPU9250Setting();
-
-  settings.accel_fs_sel = ACCEL_FS_SEL::A2G;
-  settings.gyro_fs_sel = GYRO_FS_SEL::G500DPS;
-
-  auto i = this->sensor.setup(config_data[1], settings, config_data[0]);
-  if (!i) {
-    this->enabled = false;
-  }
-}
-void MPU9250_Sensor::readSensor() {
-  if (!this->enabled) {
-    return;
-  }
-  if (this->sensor.update()) {
-    std::vector<float> float_data;
-    for (int i = 0; i < 3; i++) {
-      float_data.push_back(this->sensor.getAcc(i));
-    }
-    for (int i = 0; i < 3; i++) {
-      float_data.push_back(this->sensor.getGyro(i));
-    }
-    for (int i = 0; i < 3; i++) {
-      float_data.push_back(this->sensor.getMag(i));
-    }
-
-    // Read out quaternion estimation
-    float_data.push_back(this->sensor.getQuaternionX());
-    float_data.push_back(this->sensor.getQuaternionY());
-    float_data.push_back(this->sensor.getQuaternionZ());
-    float_data.push_back(this->sensor.getQuaternionW());
-
-    const unsigned char *bytes =
-        reinterpret_cast<const uint8_t *>(&float_data[0]);
-    static_assert(sizeof(float) == 4);
-    std::vector<uint8_t> data(bytes, bytes + sizeof(float) * float_data.size());
-    this->writeSensorData(data);
-  }
-}
-
-HX711_Sensor::HX711_Sensor(uint8_t sensor_data[SENSORS_MAX_SETTINGS_A]) {
-  auto dout = sensor_data[0];
-  auto sck = sensor_data[1];
-  this->sensor.begin(dout, sck);
-}
-void HX711_Sensor::readSensor() {
-  if (this->sensor.is_ready()) {
-    auto reading = this->sensor.read();
-    static_assert(sizeof(reading) == 4);
-    std::vector<uint8_t> data(reinterpret_cast<const char *>(&reading),
-                              reinterpret_cast<const char *>(&reading) +
-                                  sizeof(reading));
-    this->writeSensorData(data);
-  }
-}
-
-INA226_Sensor::INA226_Sensor(uint8_t sensor_data[SENSORS_MAX_SETTINGS_A]) {
-  auto port = sensor_data[0];
-  auto addr = sensor_data[1];
-  if (addr < 0b1000'000 || addr > 0b100'1111) {
-    addr = 0b100'0000;
-  }
-  this->sensor = new INA226_WE(addr, port);
-  if (!this->sensor->init()) {
-    this->stop = true;
-    return;
-  }
-  this->sensor->setResistorRange(0.010, 8.3);
-  // this->sensor.av
-  this->sensor->setAverage(INA226_AVERAGES::AVERAGE_256);
-  this->sensor->setMeasureMode(INA226_MEASURE_MODE::CONTINUOUS);
-}
-
-void INA226_Sensor::readSensor() {
-  static uint32_t last_scan = 0;
-  if (this->stop) {
-    send_debug_info(12, 14);
-    return;
-  }
-  if (time_us_32() - last_scan <=
-      200'000) // update every 200ms, sensor has new data every 1.1ms*256
-  {
-    return;
-  }
-  last_scan = time_us_32();
-  std::vector<float> float_data;
-  float f = this->sensor->getBusVoltage_V();
-  float_data.push_back(f);
-  float_data.push_back(this->sensor->getCurrent_A());
-  const unsigned char *bytes =
-      reinterpret_cast<const uint8_t *>(&float_data[0]);
-  static_assert(sizeof(float) == 4);
-  std::vector<uint8_t> data(bytes, bytes + sizeof(float) * float_data.size());
-  this->writeSensorData(data);
-}
-
-HMC5883L_Sensor::HMC5883L_Sensor(uint8_t settings[SENSORS_MAX_SETTINGS_A]) {
-  int i2c_port = settings[0];
-  // this->i2c_addr = settings[1];
-  // this->init_sequence();
-  this->sensor = new HMC5883L();
-  this->sensor->i2c_port = i2c_port;
-  auto ok = this->sensor->begin();
-  if (!ok) {
-    this->stop = true;
-  }
-  this->sensor->setRange(HMC5883L_RANGE_1_3GA);
-
-  // Set measurement mode
-  this->sensor->setMeasurementMode(HMC5883L_CONTINOUS);
-
-  // Set data rate
-  this->sensor->setDataRate(HMC5883L_DATARATE_30HZ);
-
-  // Set number of samples averaged
-  this->sensor->setSamples(HMC5883L_SAMPLES_8);
-
-  // Set calibration offset. See HMC5883L_calibration.ino
-  this->sensor->setOffset(0, 0, 0);
-}
-
-void HMC5883L_Sensor::readSensor() {
-  if (this->stop) {
-    return;
-  }
-  std::vector<uint8_t> data;
-  auto v = this->sensor->readNormalize();
-  static_assert(sizeof(v) == (4 * 3)); // 3 floats
-
-  for (auto i = 0; i < 3; i++) { // 3 floats, xyz
-    auto f = v.data[i];
-    const unsigned char *bytes = reinterpret_cast<const uint8_t *>(&f);
-    data.insert(data.end(), bytes, bytes + sizeof(f));
-    static_assert(sizeof(f) == 4);
-  }
-  this->writeSensorData(data);
-}
-
-void Sensor::writeSensorData(std::vector<uint8_t> data) {
-  std::vector<uint8_t> out = {
-      0,                  // write len
-      SENSOR_REPORT,      // write type
-      (uint8_t)this->num, // write num
-      this->type,         // write sensor type
-  };
-  out.insert(out.end(), data.begin(), data.end());
-  out[0] = out.size() - 1; // dont count the packet length
-
-  serial_write(out);
-}
-
-void serial_write(std::vector<uint8_t> data) {
-
-  // stdio_out_chars_crlf((char *)data.data(), data.size());
-  // stdio_usb.out_chars((char *)data.data(), data.size());
-  for (auto byte : data) {
-    putchar_raw(byte);
-  }
-  if (uart_enabled) {
-    for (auto byte : data) {
-      uart_putc_raw(UART_ID, byte);
-    }
-  }
-}
-
-void put_byte(uint8_t byte) {
-  if (uart_enabled) {
-    uart_putc_raw(UART_ID, byte);
-  }
-  // stdio_usb.out_chars(&byte, 1);
-  putchar_raw(byte);
-}
 /***********************************************/
 /***************MODULES*************************/
 void module_new() {
@@ -1609,271 +1321,6 @@ void module_data() {
   modules[module_num]->writeModule(data);
 }
 
-PCA9685_Module::PCA9685_Module(std::vector<uint8_t> &data) {
-  // init pca
-  // write_i2c(this->i2c_port, 00, {06}); // reset
-  sleep_us(100);
-  this->i2c_port = data[0];
-  auto update_rate = 50;
-
-  if (data.size() == 4) {
-    this->addr = data[1];
-    update_rate = data[2] << 8 | data[3];
-  }
-  write_i2c(this->i2c_port, this->addr,
-            {MODE_1, MODE_1_VAL_SLEEP}); // go to sleep for prescaler
-
-  const auto clock = 25'000'000;
-  uint8_t prescale = (int)((clock) / (4096 * update_rate)) - 1; // For servos
-  write_i2c(this->i2c_port, this->addr, {PRESCALE, prescale});
-  write_i2c(this->i2c_port, this->addr,
-            {MODE_1, MODE_1_VAL}); // restart and auto increment
-  sleep_ms(100);
-}
-
-void PCA9685_Module::readModule() {
-  // no data to read
-}
-
-// NOTE: THERE IS A RESET/RESTART COMMAND
-// LINK:
-// https://github.com/adafruit/Adafruit-PWM-Servo-Driver-Library/blob/73cf3ecc79c7c33a72f8ce1a3d91ca556cd34ab3/Adafruit_PWMServoDriver.cpp#L87-L93
-void PCA9685_Module::resetModule() {
-  for (auto i = 0; i < 16; i++) {
-    std::vector<uint8_t> data = {(uint8_t)i, 0, 0, 0, 0};
-    this->updateOne(data, 0);
-  }
-}
-
-void PCA9685_Module::updateOne(std::vector<uint8_t> &dataList, size_t i) {
-  std::array<uint8_t, 5> data;
-  auto LEDn = dataList[0 + i * 5];
-  if (LEDn > 15) {
-    return;
-  }
-  data[0] = REGISTERS::LEDn_ON_L_base + LEDn_DIFF * LEDn;
-  // outputting data is always low bytes, then high bytes
-  data[1] = dataList[1 + i * 5];
-  data[2] = dataList[2 + i * 5];
-  data[3] = dataList[3 + i * 5];
-  data[4] = dataList[4 + i * 5];
-  this->ok = write_i2c_t(this->i2c_port, this->addr, data);
-}
-
-void PCA9685_Module::writeModule(std::vector<uint8_t> &data) {
-  // data format:
-  // 0: output #
-  // 1 + 2 ON
-  // 3+4 OFF
-  // update real module
-  this->ok = true;
-  for (uint8_t i = 0; i < data.size() / 5; i++) {
-    this->updateOne(data, i);
-    if (!this->ok) {
-      return;
-    }
-  }
-}
-
-/**
- * When creating a servo chain:
- * Byte1: 0: uart0, 1: uart1
- * Byte2: rx pin
- * Byte3: tx pin
- * Byte4: wanted amount of servos
- * Byte5-N: ids of servos
- */
-Hiwonder_Servo::Hiwonder_Servo(std::vector<uint8_t> &data) {
-
-  auto uart = data[0] == 0 ? uart0 : uart1;
-  auto rxPin = data[1];
-  auto txPin = data[2];
-  auto servos = data[3];
-  if (data.size() != (uint8_t)(servos + 4)) {
-    return;
-  }
-  this->bus = new HiwonderBus();
-
-  this->bus->begin(uart, rxPin, txPin);
-  this->servos.reserve(servos);
-  for (auto i = 0; i < servos; i++) {
-    auto id = data[4 + i];
-    auto servo = new HiwonderServo(this->bus, id);
-    servo->initialize();
-    // auto offset = servo->read_angle_offset();
-    this->servos.push_back(servo);
-    this->enabled_servos++;
-  }
-  this->bus->enableAll();
-}
-
-bool Hiwonder_Servo::writeSingle(std::vector<uint8_t> &data, size_t i,
-                                 bool single) {
-  const auto offset = 2; // 1 for msg_type, 1 for count
-  const int numBytes = 5;
-  auto servoI = data[offset + numBytes * i];
-  auto angle = ((int32_t)data[offset + 1 + numBytes * i] << 8) |
-               data[offset + 2 + numBytes * i];
-  auto time = ((int16_t)data[offset + 3 + numBytes * i] << 8) |
-              data[offset + 4 + numBytes * i];
-
-  if (servoI >= this->servos.size()) {
-    return false;
-  }
-  if (single) {
-    this->servos[servoI]->move_time(angle, time);
-  } else {
-    this->servos[servoI]->move_time_and_wait_for_sync(angle, time);
-  }
-
-  // repair servo if it was disabled
-  if (this->servos[servoI]->isCommandOk() && this->servos[servoI]->disabled) {
-    this->servos[servoI]->fault_count = 0;
-    this->servos[servoI]->disabled = false;
-    this->enabled_servos++;
-  }
-  return true;
-}
-
-void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
-  auto msg_type = data[0];
-  if (!timeout_safe()) {
-    return;
-  }
-  if (msg_type == 1) { // normal set angle command with one or multiple servos
-    auto count = data[1];
-    // If just one, directly move, otherwise wait for the other commands to
-    // finish before moving
-    if (count == 1) {
-      this->writeSingle(data, 0, true);
-    } else {
-      if (data.size() != (uint8_t)(count * 5 + 2)) {
-        return;
-      }
-      for (auto i = 0; i < count; i++) {
-        this->writeSingle(data, i, false);
-      }
-      this->bus->move_sync_start();
-    }
-  } else if (msg_type == 2) { // enable msg
-    auto count = data[1];
-    auto enabled = data[2];
-    if (count == 0) { // all servos
-      if (enabled) {
-        this->bus->enableAll();
-      } else {
-        this->bus->disableAll();
-      }
-      return;
-    }
-    for (auto i = 0; i < count; i++) {
-      auto servoI = data[3 + i];
-      if (servoI >= this->servos.size()) {
-        return;
-      }
-      if (enabled == 1) {
-        this->servos[servoI]->enable();
-      } else {
-        this->servos[servoI]->disable();
-      }
-    }
-  } else if (msg_type == 3) { // update id
-    auto new_id = data[1];
-    this->bus->id_write(new_id);
-  } else if (msg_type == 4) {
-    // id read
-    auto check_id = data[1];
-    HiwonderServo tempServo(this->bus, check_id);
-    auto ok = tempServo.id_verify();
-    std::vector<uint8_t> data = {
-        4,        // id check type
-        check_id, // id
-        ok,       // ok
-    };
-    this->publishData(data);
-  } else if (msg_type == 5) {
-    // range write
-    auto id = data[1];
-    int16_t min = ((int16_t)data[2] << 8) | data[3];
-    int16_t max = ((int16_t)data[4] << 8) | data[5];
-    this->servos[id]->setLimitsTicks(min / 24,
-                                     max / 24); // 24 centidegrees per tick
-  } else if (msg_type == 6) {
-    // read range of servo stored in servo
-    auto id = data[1];
-    this->servos[id]->readLimits();
-    auto min = this->servos[id]->minCentDegrees;
-    auto max = this->servos[id]->maxCentDegrees;
-    std::vector<uint8_t> data = {6,  // id check type
-                                 id, // id
-                                 (uint8_t)(min >> 8),
-                                 (uint8_t)(min & 0xff),
-                                 (uint8_t)(max >> 8),
-                                 (uint8_t)(max & 0xff)};
-    this->publishData(data);
-  } else if (msg_type == 7) { // Set offset in centideg
-    auto id = data[1];
-    int16_t offset = ((int16_t)data[2] << 8) | data[3];
-    offset /= 24;
-    this->servos[id]->angle_offset_adjust(offset);
-    this->servos[id]->angle_offset_save();
-  } else if (msg_type == 8) {
-    auto id = data[1];
-    auto offset = this->servos[id]->read_angle_offset() * 24;
-    std::vector<uint8_t> data = {8,  // offset type
-                                 id, // id
-                                 (uint8_t)(offset >> 8),
-                                 (uint8_t)(offset & 0xff)};
-    this->publishData(data);
-  } else if (msg_type == 9) { // write voltage limits
-    auto id = data[1];
-    uint32_t vMin = ((uint16_t)data[2] << 8) | data[3];
-    uint32_t vMax = ((uint16_t)data[4] << 8) | data[5];
-    this->servos[id]->setVoltageLimits(vMin, vMax);
-  }
-}
-
-void Hiwonder_Servo::readModule() {
-  if (!timeout_safe()) {
-    return;
-  }
-  if (this->enabled_servos == 0) {
-    return;
-  }
-  // read angle, temp?
-  std::vector<uint8_t> data;
-  data.reserve(this->servos.size() * 3 + 1);
-  data.push_back(0); // message type servo angles
-  // only update position when changed
-  for (auto i = 0; auto servo : this->servos) {
-    if (servo->disabled) { // skip disabled servos, they are very slow
-      i++;
-      continue;
-    }
-    auto pos = servo->pos_read();
-    if (servo->isCommandOk()) {
-      servo->fault_count = 0;
-    } else {
-      servo->fault_count++;
-      if (servo->fault_count > 2) {
-        servo->disabled = true;
-        this->enabled_servos--;
-      }
-    }
-    if (pos != servo->lastPublishedPosition) {
-      data.push_back(i);
-      // Pos is 0...24000 -> 15 bits
-      data.insert(data.end(),
-                  {(uint8_t)((pos >> 8) & 0xff), (uint8_t)(pos & 0xff)});
-    }
-    servo->lastPublishedPosition = pos;
-    i++;
-  }
-  if (data.size() > 1) {
-    this->publishData(data);
-  }
-}
-
 // Shutdown_Relay::Shutdown_Relay(std::vector<uint8_t> &data) {
 //   this->pin = data[0];
 //   this->enable_on = data[1];
@@ -1884,6 +1331,10 @@ void Hiwonder_Servo::readModule() {
 //   this->start_time = time_us_32();
 //   this->enabled = false;
 // }
+
+bool watchdog_enable_shutdown = true; // if false, then don't do anything with
+                                      // the watchdog and just wait for shutdown
+
 void disable_watchdog() {
   hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
 }
@@ -1925,19 +1376,6 @@ void enable_watchdog() {
 //   }
 //   gpio_put(LED_PIN, this->enabled);
 // }
-
-void Module::publishData(const std::vector<uint8_t> &data) {
-  std::vector<uint8_t> out = {
-      0,                  // write len
-      MODULE_REPORT,      // write type
-      (uint8_t)this->num, // write num
-      this->type,         // write sensor type
-  };
-  out.insert(out.end(), data.begin(), data.end());
-  out[0] = out.size() - 1; // dont count the packet length
-
-  serial_write(out);
-}
 
 /**********************ORIGINAL MODULES******************************/
 
@@ -2071,18 +1509,6 @@ void set_id() {
   serial_write(id_msg, 3);
 }
 
-/*************************************************
- * Write data to serial interface
- * @param buffer
- * @param num_of_bytes_to_send
- */
-void serial_write(const int *buffer, int num_of_bytes_to_send) {
-  for (int i = 0; i < num_of_bytes_to_send; i++) {
-    put_byte((buffer[i]) & 0x00ff);
-  }
-  stdio_flush();
-}
-
 volatile bool uart_enabled = true;
 
 void check_uart_loopback() {
@@ -2116,6 +1542,7 @@ void check_uart_loopback() {
     }
   }
 }
+
 bool check_usb_connection() {
   // Read in VBUS pin
   // NOTE: this does not work with a pico W, as the VBUS pin is connected to the
@@ -2161,15 +1588,9 @@ void check_mirte_master() {
   }
 }
 #endif
-int get_byte() {
-  // If there is no uart loopback, then also check the uart for incoming data.
-  if (uart_enabled) {
-    if (uart_is_readable(UART_ID)) {
-      return uart_getc(UART_ID);
-    }
-  }
-  return getchar_timeout_us(100);
-}
+
+std::vector<Sensor *> sensors;
+std::vector<Module *> modules;
 
 /***************************************************************
  *                  MAIN FUNCTION
