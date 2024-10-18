@@ -11,7 +11,7 @@ jobs:
     - uses: DoozyX/clang-format-lint-action@v0.14
       with:
         source: '.'
-        # exclude: './third_party ./external'
+        exclude: './pico-ssd1306'
         extensions: 'c,h,cpp,hpp'
         clangFormatVersion: 14
         style: llvm

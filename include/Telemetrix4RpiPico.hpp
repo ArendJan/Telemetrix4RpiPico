@@ -579,7 +579,8 @@ typedef struct {
   encoder_t encoders[MAX_ENCODERS];
   mutex_t mutex;
 } encoder_data;
-encoder_data encoders = {.next_encoder_index = 0, .trigger_timer = {}, .encoders = {}, .mutex = {}};
+encoder_data encoders = {
+    .next_encoder_index = 0, .trigger_timer = {}, .encoders = {}, .mutex = {}};
 typedef struct {
   // a pointer to the command processing function
   void (*command_func)(void);
