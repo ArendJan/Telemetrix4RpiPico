@@ -69,7 +69,7 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
   if (!timeout_safe()) {
     return;
   }
-  if (msg_type == 1) { // normal set angle command with one or multiple servos
+  if (msg_type == SET_ANGLE) { // normal set angle command with one or multiple servos
     auto count = data[1];
     // If just one, directly move, otherwise wait for the other commands to
     // finish before moving
@@ -85,7 +85,7 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
       this->bus->move_sync_start();
     }
     // TODO: Add Ok Send?
-  } else if (msg_type == 2) { // enable msg
+  } else if (msg_type == ENABLE) { // enable msg
     auto count = data[1];
     auto enabled = data[2];
     if (count == 0) { // all servos
@@ -107,55 +107,55 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
         this->servos[servoI]->disable();
       }
     }
-  } else if (msg_type == 3) { // update id
+  } else if (msg_type == ID_WRITE) { // update id
     auto new_id = data[1];
     this->bus->id_write(new_id);
-  } else if (msg_type == 4) {
+  } else if (msg_type == ID_VERIFY) {
     // id read
     auto check_id = data[1];
     HiwonderServo tempServo(this->bus, check_id);
-    auto ok = tempServo.id_verify();
+    bool ok = tempServo.id_verify() == check_id;
     std::vector<uint8_t> data = {
-        4,        // id check type
-        check_id, // id
-        ok,       // ok
+        ID_VERIFY,        // id check type
+        check_id,         // id
+        (uint8_t) ok,     // ok
     };
     this->publishData(data);
-  } else if (msg_type == 5) {
+  } else if (msg_type == RANGE_WRITE) {
     // range write
     auto id = data[1];
     int16_t min = ((int16_t)data[2] << 8) | data[3];
     int16_t max = ((int16_t)data[4] << 8) | data[5];
     this->servos[id]->setLimitsTicks(min / 24,
                                      max / 24); // 24 centidegrees per tick
-  } else if (msg_type == 6) {
+  } else if (msg_type == RANGE_READ) {
     // read range of servo stored in servo
     auto id = data[1];
     this->servos[id]->readLimits();
     auto min = this->servos[id]->minCentDegrees;
     auto max = this->servos[id]->maxCentDegrees;
-    std::vector<uint8_t> data = {6,  // id check type
+    std::vector<uint8_t> data = {RANGE_READ,  // id check type
                                  id, // id
                                  (uint8_t)(min >> 8),
                                  (uint8_t)(min & 0xff),
                                  (uint8_t)(max >> 8),
                                  (uint8_t)(max & 0xff)};
     this->publishData(data);
-  } else if (msg_type == 7) { // Set offset in centideg
+  } else if (msg_type == OFFSET_WRITE) { // Set offset in centideg
     auto id = data[1];
     int16_t offset = ((int16_t)data[2] << 8) | data[3];
     offset /= 24;
     this->servos[id]->angle_offset_adjust(offset);
     this->servos[id]->angle_offset_save();
-  } else if (msg_type == 8) {
+  } else if (msg_type == OFFSET_READ) {
     auto id = data[1];
     auto offset = this->servos[id]->read_angle_offset() * 24;
-    std::vector<uint8_t> data = {8,  // offset type
+    std::vector<uint8_t> data = {OFFSET_READ,  // offset type
                                  id, // id
                                  (uint8_t)(offset >> 8),
                                  (uint8_t)(offset & 0xff)};
     this->publishData(data);
-  } else if (msg_type == 9) { // write voltage limits
+  } else if (msg_type == VOLTAGE_LIMIT_WRITE) { // write voltage limits
     auto id = data[1];
     uint32_t vMin = ((uint16_t)data[2] << 8) | data[3];
     uint32_t vMax = ((uint16_t)data[4] << 8) | data[5];
@@ -173,7 +173,7 @@ void Hiwonder_Servo::readModule() {
   // read angle, temp?
   std::vector<uint8_t> data;
   data.reserve(this->servos.size() * 3 + 1);
-  data.push_back(0); // message type servo angles
+  data.push_back(GET_ANGLE); // message type servo angles
   // only update position when changed
   for (auto i = 0; auto servo : this->servos) {
     if (servo->disabled) { // skip disabled servos, they are very slow

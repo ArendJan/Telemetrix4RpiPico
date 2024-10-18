@@ -14,6 +14,29 @@ public:
   bool writeSingle(std::vector<uint8_t> &data, size_t i, bool single);
   void resetModule(){};
 
+  enum MessageType : uint8_t {
+    // GET_ANGLE
+    GET_ANGLE = 0,
+    // normal set angle command with one or multiple servos
+    SET_ANGLE = 1,
+    // enable msg
+    ENABLE = 2,
+    // update id
+    ID_WRITE = 3,
+     // id read
+    ID_VERIFY = 4,
+    // range write
+    RANGE_WRITE = 5,
+    // read range of servo stored in servo
+    RANGE_READ = 6,
+    // Set offset in centideg
+    OFFSET_WRITE = 7,
+    // Read offset
+    OFFSET_READ = 8,
+    // write voltage limits
+    VOLTAGE_LIMIT_WRITE = 9,
+  };
+
 private:
   HiwonderBus *bus = nullptr;
   std::vector<HiwonderServo *> servos = {};
