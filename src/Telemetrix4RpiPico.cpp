@@ -407,6 +407,7 @@ void enable_all_reports() {
  * Use the watchdog time to reset the board.
  */
 void reset_board() {
+  reset_hardware();
   watchdog_reboot(0, 0, 0);
   watchdog_enable(10, 1);
 }
@@ -738,18 +739,18 @@ int encoder_report_message[] = {3, ENCODER_REPORT, 0, 0};
 int c = 0;
 void scan_encoders() {
   if (encoders.next_encoder_index < 1) {
-    send_debug_info(1,1);
+    send_debug_info(1, 1);
     return;
   }
   if (!mutex_try_enter(&encoders.mutex, NULL)) {
     send_debug_info(1, 0);
     return;
   }
-  if(c%100 == 0){ 
+  if (c % 100 == 0) {
     // send_debug_info(2, x);
     c = 0;
-    
-    if(x == 0) {
+
+    if (x == 0) {
       // create_encoder_timer();
     }
     x = 0;
@@ -1200,16 +1201,19 @@ bool timeout_safe() { return time_us_32() - last_ping < wd_timeout_time / 2; }
 void check_wd_timeout() {
   // if watchdog is about to run out of time, reset modules
   if (time_us_32() - last_ping >= (wd_timeout_time)) {
-    for (auto &sensor : sensors) {
-      sensor->resetSensor();
-    }
-    for (auto &module : modules) {
-      module->resetModule();
-    }
-    reset_neo_pixels();
+    reset_hardware();
   }
 }
 
+void reset_hardware() {
+  for (auto &sensor : sensors) {
+    sensor->resetSensor();
+  }
+  for (auto &module : modules) {
+    module->resetModule();
+  }
+  reset_neo_pixels();
+}
 // SENSORSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
 
 void sensor_new() {
@@ -1328,7 +1332,7 @@ VEML6040_Sensor::VEML6040_Sensor(uint8_t settings[SENSORS_MAX_SETTINGS_A]) {
 void VEML6040_Sensor::init_sequence() {
   bool ok = write_i2c(this->i2c_port, this->i2c_addr,
                       {
-                          0,             // register 0
+                          0, // register 0
                           // 0b000 << 4 |   // timing 40ms
                           //     0b0 << 2 | // no trigger
                           //     0b0 << 1 | // auto mode
@@ -1339,7 +1343,7 @@ void VEML6040_Sensor::init_sequence() {
   sleep_ms(10);
   ok &= write_i2c(this->i2c_port, this->i2c_addr,
                   {
-                      0,             // register 0
+                      0, // register 0
                       // 0b000 << 4 |   // timing 40ms
                       //     0b0 << 2 | // no trigger
                       //     0b0 << 1 | // auto mode
@@ -1389,9 +1393,14 @@ void VL53L0X_Sensor::readSensor() {
   this->writeSensorData(data);
 }
 
-MPU9250_Sensor::MPU9250_Sensor(uint8_t settings[SENSORS_MAX_SETTINGS_A]) {
-  this->sensor.bus = settings[0];
-  auto i = this->sensor.setup(0x68, MPU9250Setting(), settings[0]);
+MPU9250_Sensor::MPU9250_Sensor(uint8_t config_data[SENSORS_MAX_SETTINGS_A]) {
+  this->sensor.bus = config_data[0];
+  auto settings = MPU9250Setting();
+
+  settings.accel_fs_sel = ACCEL_FS_SEL::A2G;
+  settings.gyro_fs_sel = GYRO_FS_SEL::G500DPS;
+
+  auto i = this->sensor.setup(config_data[1], settings, config_data[0]);
   if (!i) {
     this->enabled = false;
   }
@@ -1411,6 +1420,13 @@ void MPU9250_Sensor::readSensor() {
     for (int i = 0; i < 3; i++) {
       float_data.push_back(this->sensor.getMag(i));
     }
+
+    // Read out quaternion estimation
+    float_data.push_back(this->sensor.getQuaternionX());
+    float_data.push_back(this->sensor.getQuaternionY());
+    float_data.push_back(this->sensor.getQuaternionZ());
+    float_data.push_back(this->sensor.getQuaternionW());
+
     const unsigned char *bytes =
         reinterpret_cast<const uint8_t *>(&float_data[0]);
     static_assert(sizeof(float) == 4);
@@ -1619,6 +1635,9 @@ void PCA9685_Module::readModule() {
   // no data to read
 }
 
+// NOTE: THERE IS A RESET/RESTART COMMAND
+// LINK:
+// https://github.com/adafruit/Adafruit-PWM-Servo-Driver-Library/blob/73cf3ecc79c7c33a72f8ce1a3d91ca556cd34ab3/Adafruit_PWMServoDriver.cpp#L87-L93
 void PCA9685_Module::resetModule() {
   for (auto i = 0; i < 16; i++) {
     std::vector<uint8_t> data = {(uint8_t)i, 0, 0, 0, 0};
@@ -1639,7 +1658,6 @@ void PCA9685_Module::updateOne(std::vector<uint8_t> &dataList, size_t i) {
   data[3] = dataList[3 + i * 5];
   data[4] = dataList[4 + i * 5];
   this->ok = write_i2c_t(this->i2c_port, this->addr, data);
-
 }
 
 void PCA9685_Module::writeModule(std::vector<uint8_t> &data) {
@@ -1651,7 +1669,7 @@ void PCA9685_Module::writeModule(std::vector<uint8_t> &data) {
   this->ok = true;
   for (uint8_t i = 0; i < data.size() / 5; i++) {
     this->updateOne(data, i);
-    if(!this->ok){
+    if (!this->ok) {
       return;
     }
   }

@@ -124,6 +124,9 @@ extern volatile bool uart_enabled;
 #define UART_TX_PIN 0
 #define UART_RX_PIN 1
 
+// Resets all hardware devices
+void reset_hardware();
+
 /*********************************************************
  *                       COMMAND DEFINES
  ********************************************************/
@@ -576,7 +579,8 @@ typedef struct {
   encoder_t encoders[MAX_ENCODERS];
   mutex_t mutex;
 } encoder_data;
-encoder_data encoders = {.next_encoder_index = 0, .trigger_timer = {}, .encoders = {}, .mutex = {}};
+encoder_data encoders = {
+    .next_encoder_index = 0, .trigger_timer = {}, .encoders = {}, .mutex = {}};
 typedef struct {
   // a pointer to the command processing function
   void (*command_func)(void);
