@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 set(CMAKE_CXX_STANDARD 20)
 
-# set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
 
 set(PICO_SDK_FETCH_FROM_GIT on)
 include(pico_sdk_import.cmake)
@@ -17,6 +17,7 @@ add_executable(
   src/Telemetrix4RpiPico.cpp
   src/i2c_helpers.cpp
   src/uart.cpp
+  src/serialization.cpp
   src/drivers/HMC5883L.cpp
   src/drivers/HX711.cpp
   src/drivers/HiwonderServo.cpp

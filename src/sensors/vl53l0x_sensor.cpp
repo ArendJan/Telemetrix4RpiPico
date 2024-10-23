@@ -1,5 +1,7 @@
 #include "sensors/vl53l0x_sensor.hpp"
 
+#include "serialization.hpp"
+
 VL53L0X_Sensor::VL53L0X_Sensor(uint8_t settings[SENSORS_MAX_SETTINGS_A]) {
   this->sensor.setBus(settings[0]);
   bool ok = this->sensor.init();
@@ -13,6 +15,6 @@ VL53L0X_Sensor::VL53L0X_Sensor(uint8_t settings[SENSORS_MAX_SETTINGS_A]) {
 
 void VL53L0X_Sensor::readSensor() {
   auto dist = this->sensor.readRangeContinuousMillimeters();
-  std::vector<uint8_t> data = {(uint8_t)(dist >> 8), (uint8_t)(dist & 0xFF)};
+  std::vector<uint8_t> data = encode_u16(dist);
   this->writeSensorData(data);
 }

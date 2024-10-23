@@ -35,6 +35,7 @@ void MPU9250_Sensor::readSensor() {
     float_data.push_back(this->sensor.getQuaternionZ());
     float_data.push_back(this->sensor.getQuaternionW());
 
+    // This is fine, bytes are in weird order (but tmx-cpp knows)
     const unsigned char *bytes =
         reinterpret_cast<const uint8_t *>(&float_data[0]);
     static_assert(sizeof(float) == 4);

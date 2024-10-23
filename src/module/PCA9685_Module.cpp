@@ -3,6 +3,7 @@
 #include "hardware/clocks.h"
 
 #include "i2c_helpers.hpp"
+#include "serialization.hpp"
 
 PCA9685_Module::PCA9685_Module(std::vector<uint8_t> &data) {
   // init pca
@@ -13,7 +14,7 @@ PCA9685_Module::PCA9685_Module(std::vector<uint8_t> &data) {
 
   if (data.size() == 4) {
     this->addr = data[1];
-    update_rate = data[2] << 8 | data[3];
+    update_rate = decode_u16(std::span(data).subspan<2,sizeof(uint16_t)>());
   }
   write_i2c(this->i2c_port, this->addr,
             {MODE_1, MODE_1_VAL_SLEEP}); // go to sleep for prescaler
@@ -48,10 +49,11 @@ void PCA9685_Module::updateOne(std::vector<uint8_t> &dataList, size_t i) {
   }
   data[0] = REGISTERS::LEDn_ON_L_base + LEDn_DIFF * LEDn;
   // outputting data is always low bytes, then high bytes
-  data[1] = dataList[1 + i * 5];
-  data[2] = dataList[2 + i * 5];
-  data[3] = dataList[3 + i * 5];
-  data[4] = dataList[4 + i * 5];
+  data[1] = dataList[2 + i * 5];
+  data[2] = dataList[1 + i * 5];
+
+  data[3] = dataList[4 + i * 5];
+  data[4] = dataList[3 + i * 5];
   this->ok = write_i2c_t(this->i2c_port, this->addr, data);
 }
 

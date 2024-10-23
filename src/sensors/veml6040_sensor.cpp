@@ -44,8 +44,9 @@ void VEML6040_Sensor::readSensor() {
   for (uint8_t reg = 0x08; reg <= 0x0B;
        reg++) { // read the 4 registers and add the data to the full data vector
     ok &= read_i2c(this->i2c_port, this->i2c_addr, {reg}, 2, single_color_data);
-    data.push_back(single_color_data[0]);
+    // Flip the order to make it match the rest.
     data.push_back(single_color_data[1]);
+    data.push_back(single_color_data[0]);
   }
 
   this->writeSensorData(data);

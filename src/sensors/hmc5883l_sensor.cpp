@@ -35,6 +35,8 @@ void HMC5883L_Sensor::readSensor() {
 
   for (auto i = 0; i < 3; i++) { // 3 floats, xyz
     auto f = v.data[i];
+
+    // This is fine, bytes are in weird order (but tmx-cpp knows)
     const unsigned char *bytes = reinterpret_cast<const uint8_t *>(&f);
     data.insert(data.end(), bytes, bytes + sizeof(f));
     static_assert(sizeof(f) == 4);

@@ -1,6 +1,7 @@
 #include "module/Hiwonder_Servo.hpp"
 
 #include "message_types.hpp"
+#include "serialization.hpp"
 
 #include "Telemetrix4RpiPico.hpp"
 
@@ -40,11 +41,14 @@ bool Hiwonder_Servo::writeSingle(std::vector<uint8_t> &data, size_t i,
                                  bool single) {
   const auto offset = 2; // 1 for msg_type, 1 for count
   const int numBytes = 5;
-  auto servoI = data[offset + numBytes * i];
-  auto angle = ((int32_t)data[offset + 1 + numBytes * i] << 8) |
-               data[offset + 2 + numBytes * i];
-  auto time = ((int16_t)data[offset + 3 + numBytes * i] << 8) |
-              data[offset + 4 + numBytes * i];
+  auto data_span = std::span(data).subspan(offset + numBytes*i).first<numBytes>();
+  auto servoI = data_span[0];
+  // TODO: What happens here?
+  // TODO: Maybe this needs to decode a i16
+  auto angle = (int32_t)decode_u16(data_span.subspan<1, sizeof(uint16_t)>());
+  // ((int32_t)data[offset + 1 + numBytes * i] << 8) |
+  //        data[offset + 2 + numBytes * i];
+  auto time = decode_u16(data_span.subspan<3,sizeof(uint16_t)>());
 
   if (servoI >= this->servos.size()) {
     return false;
@@ -65,6 +69,7 @@ bool Hiwonder_Servo::writeSingle(std::vector<uint8_t> &data, size_t i,
 }
 
 void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
+  auto data_span = std::span(data);
   auto msg_type = data[0];
   if (!timeout_safe()) {
     return;
@@ -124,8 +129,8 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
   } else if (msg_type == RANGE_WRITE) {
     // range write
     auto id = data[1];
-    int16_t min = ((int16_t)data[2] << 8) | data[3];
-    int16_t max = ((int16_t)data[4] << 8) | data[5];
+    int16_t min = decode_u16(data_span.subspan<2,sizeof(uint16_t)>());//((int16_t)data[2] << 8) | data[3];
+    int16_t max = decode_u16(data_span.subspan<4,sizeof(uint16_t)>());//((int16_t)data[4] << 8) | data[5];
     this->servos[id]->setLimitsTicks(min / 24,
                                      max / 24); // 24 centidegrees per tick
   } else if (msg_type == RANGE_READ) {
@@ -135,15 +140,17 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
     auto min = this->servos[id]->minCentDegrees;
     auto max = this->servos[id]->maxCentDegrees;
     std::vector<uint8_t> data = {RANGE_READ,  // id check type
-                                 id, // id
-                                 (uint8_t)(min >> 8),
-                                 (uint8_t)(min & 0xff),
-                                 (uint8_t)(max >> 8),
-                                 (uint8_t)(max & 0xff)};
+                                 id};//, // id
+    // data.reserve(data.size() + 2 * sizeof(uint16_t));
+
+    append_range(data, encode_u16((uint16_t)min));
+    append_range(data, encode_u16((uint16_t)max));
+
     this->publishData(data);
   } else if (msg_type == OFFSET_WRITE) { // Set offset in centideg
     auto id = data[1];
-    int16_t offset = ((int16_t)data[2] << 8) | data[3];
+    // TODO: Maybe i16 decode instead
+    int16_t offset = (int16_t)decode_u16(data_span.subspan<2,sizeof(uint16_t)>());//((int16_t)data[2] << 8) | data[3];
     offset /= 24;
     this->servos[id]->angle_offset_adjust(offset);
     this->servos[id]->angle_offset_save();
@@ -151,14 +158,14 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
     auto id = data[1];
     auto offset = this->servos[id]->read_angle_offset() * 24;
     std::vector<uint8_t> data = {OFFSET_READ,  // offset type
-                                 id, // id
-                                 (uint8_t)(offset >> 8),
-                                 (uint8_t)(offset & 0xff)};
+                                 id}; // id
+    append_range(data, encode_u16(offset));
     this->publishData(data);
   } else if (msg_type == VOLTAGE_LIMIT_WRITE) { // write voltage limits
     auto id = data[1];
-    uint32_t vMin = ((uint16_t)data[2] << 8) | data[3];
-    uint32_t vMax = ((uint16_t)data[4] << 8) | data[5];
+    // TODO: Shouldn't this use more bytes?
+    uint32_t vMin = decode_u16(data_span.subspan<2,sizeof(uint16_t)>());
+    uint32_t vMax = decode_u16(data_span.subspan<4,sizeof(uint16_t)>());
     this->servos[id]->setVoltageLimits(vMin, vMax);
   }
 }
@@ -193,8 +200,7 @@ void Hiwonder_Servo::readModule() {
     if (pos != servo->lastPublishedPosition) {
       data.push_back(i);
       // Pos is 0...24000 -> 15 bits
-      data.insert(data.end(),
-                  {(uint8_t)((pos >> 8) & 0xff), (uint8_t)(pos & 0xff)});
+      append_range(data, encode_u16(pos));
     }
     servo->lastPublishedPosition = pos;
     i++;

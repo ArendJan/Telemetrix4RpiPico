@@ -43,6 +43,7 @@
 #include "drivers/neopixel.hpp"
 
 #include "Telemetrix4RpiPico.hpp"
+#include "serialization.hpp"
 /*******************************************************************
  *              GLOBAL VARIABLES, AND STORAGE
  ******************************************************************/
@@ -217,9 +218,17 @@ void serial_loopback() {
  */
 // A method to send debug data across the serial link
 void send_debug_info(uint id, uint value) {
+  auto msg = std::span(debug_info_report_message);
   debug_info_report_message[DEBUG_ID] = id;
-  debug_info_report_message[DEBUG_VALUE_HIGH_BYTE] = (value & 0xff00) >> 8;
-  debug_info_report_message[DEBUG_VALUE_LOW_BYTE] = value & 0x00ff;
+  std::copy_n(encode_u16(value).cbegin(), sizeof(uint16_t),
+              msg.subspan<DEBUG_VALUE_HIGH_BYTE, sizeof(uint16_t)>().begin());
+
+  // Assert are OK; Removed for speed;
+  // assert(debug_info_report_message[DEBUG_VALUE_HIGH_BYTE] == 
+  //        (value & 0xFF00) >> 8);
+  // assert(debug_info_report_message[DEBUG_VALUE_LOW_BYTE] == 
+  //        (value & 0x00FF));
+
   serial_write((int *)debug_info_report_message,
                sizeof(debug_info_report_message) / sizeof(int));
 }
@@ -307,9 +316,9 @@ void set_pin_mode() {
     the_analog_pins[pin].reporting_enabled =
         command_buffer[SET_PIN_MODE_ANALOG_IN_REPORTING_STATE];
     // save the differential value
-    the_analog_pins[pin].differential =
-        (int)((command_buffer[SET_PIN_MODE_ANALOG_DIFF_HIGH] << 8) +
-              command_buffer[SET_PIN_MODE_ANALOG_DIFF_LOW]);
+    the_analog_pins[pin].differential = decode_u16(
+        std::span(command_buffer)
+            .subspan<SET_PIN_MODE_ANALOG_DIFF_HIGH, sizeof(uint16_t)>());
     break;
   default:
     break;
@@ -331,13 +340,14 @@ void digital_write() {
  * Set A PWM Pin's value
  */
 void pwm_write() {
+  auto data = std::span(command_buffer);
   uint pin;
   uint16_t value;
 
   pin = command_buffer[PWM_WRITE_GPIO_PIN];
 
-  value = (command_buffer[SET_PIN_MODE_PWM_HIGH_VALUE] << 8) +
-          command_buffer[SET_PIN_MODE_PWM_LOW_VALUE];
+  value =
+      decode_u16(data.subspan<SET_PIN_MODE_PWM_HIGH_VALUE, sizeof(uint16_t)>());
   pwm_set_gpio_level(pin, value);
 }
 
@@ -883,10 +893,8 @@ void init_spi() {
     spi_port = spi1;
   }
 
-  spi_baud_rate =
-      ((command_buffer[SPI_FREQ_MSB] << 24) +
-       (command_buffer[SPI_FREQ_3] << 16) + (command_buffer[SPI_FREQ_2] << 8) +
-       (command_buffer[SPI_FREQ_1]));
+  spi_baud_rate = decode_u32(
+      std::span(command_buffer).subspan<SPI_FREQ_MSB, sizeof(uint32_t)>());
 
   spi_init(spi_port, spi_baud_rate);
 
@@ -1003,8 +1011,8 @@ void servo_attach() {
 
   auto pin = command_buffer[1];
   // auto min_pulse = command_buffer[
-  command_buffer[1] = pin;
-  command_buffer[2] = PIN_MODES::PWM;
+  command_buffer[SET_PIN_MODE_GPIO_PIN] = pin;
+  command_buffer[SET_PIN_MODE_MODE_TYPE] = PIN_MODES::PWM;
   set_pin_mode();
 }
 
@@ -1013,8 +1021,10 @@ void servo_write() {
   const uint32_t f_hz = 50; // frequency in hz.
 
   auto pin = command_buffer[1];
-  uint16_t ticks_ms = (command_buffer[2] << 8) + command_buffer[3];
-  uint32_t top = 1'000'000UL / f_hz - 1; // calculate the TOP value
+  uint16_t ticks_ms =
+      decode_u16(std::span(command_buffer).subspan<2, sizeof(uint16_t)>());
+
+  const uint32_t top = 1'000'000UL / f_hz - 1; // calculate the TOP value
 
   uint16_t value = (ticks_ms * top) / 20'000UL;
   pwm_set_gpio_level(pin, value);
@@ -1128,12 +1138,19 @@ void scan_analog_inputs() {
       value = adc_read();
       differential = abs(value - the_analog_pins[i].last_value);
       if (differential >= the_analog_pins[i].differential) {
+        auto msg_span = std::span(analog_input_report_message);
         // trigger value achieved, send out the report
         the_analog_pins[i].last_value = value;
-        // input_message[1] = the_analog_pins[i].pin_number;
         analog_input_report_message[ANALOG_INPUT_GPIO_PIN] = (uint8_t)i;
-        analog_input_report_message[ANALOG_VALUE_HIGH_BYTE] = value >> 8;
-        analog_input_report_message[ANALOG_VALUE_LOW_BYTE] = value & 0x00ff;
+        std::copy_n(encode_u16(value).cbegin(), sizeof(uint16_t),
+                    msg_span.subspan<ANALOG_VALUE_HIGH_BYTE, sizeof(uint16_t)>()
+                        .begin());
+
+        // Asserts check out; Removed for performance
+        // assert(analog_input_report_message[ANALOG_VALUE_HIGH_BYTE] == (value &
+        //        0xFF00) >> 8);
+        // assert(analog_input_report_message[ANALOG_VALUE_LOW_BYTE] == value &
+        //        0x00FF);
         serial_write(analog_input_report_message, 5);
       }
     }
@@ -1396,6 +1413,7 @@ void scan_dhts() {
   }
 }
 
+// TODO: Make use of encode/decode msgs
 void read_dht(uint dht_pin) {
   int data[5] = {0, 0, 0, 0, 0};
   uint last = 1;
