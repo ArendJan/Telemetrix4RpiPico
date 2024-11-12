@@ -34,7 +34,7 @@
 // based on VL53L0X_calc_macro_period_ps()
 // PLL_period_ps = 1655; macro_period_vclks = 2304
 #define calcMacroPeriod(vcsel_period_pclks)                                    \
-  ((((uint32_t)2304 * (vcsel_period_pclks)*1655) + 500) / 1000)
+  ((((uint32_t)2304 * (vcsel_period_pclks) * 1655) + 500) / 1000)
 
 // Constructors ////////////////////////////////////////////////////////////////
 

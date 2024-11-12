@@ -3,7 +3,7 @@ name: test-clang-format
 on: [push, pull_request]
 
 jobs:
-  c_style_check:
+  cpp_style_check:
     runs-on: ubuntu-latest
 
     steps:
@@ -13,7 +13,7 @@ jobs:
         source: '.'
         exclude: './pico-ssd1306'
         extensions: 'c,h,cpp,hpp'
-        clangFormatVersion: 14
+        clangFormatVersion: 18
         style: llvm
   cmake-format-check:
     runs-on: ubuntu-latest

@@ -12,7 +12,7 @@ public:
   void readModule();
   void writeModule(std::vector<uint8_t> &data);
   bool writeSingle(std::vector<uint8_t> &data, size_t i, bool single);
-  void resetModule(){};
+  void resetModule() {};
 
   enum MessageType : uint8_t {
     // GET_ANGLE
@@ -23,7 +23,7 @@ public:
     ENABLE = 2,
     // update id
     ID_WRITE = 3,
-     // id read
+    // id read
     ID_VERIFY = 4,
     // range write
     RANGE_WRITE = 5,

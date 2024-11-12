@@ -14,7 +14,7 @@ PCA9685_Module::PCA9685_Module(std::vector<uint8_t> &data) {
 
   if (data.size() == 4) {
     this->addr = data[1];
-    update_rate = decode_u16(std::span(data).subspan<2,sizeof(uint16_t)>());
+    update_rate = decode_u16(std::span(data).subspan<2, sizeof(uint16_t)>());
   }
   write_i2c(this->i2c_port, this->addr,
             {MODE_1, MODE_1_VAL_SLEEP}); // go to sleep for prescaler

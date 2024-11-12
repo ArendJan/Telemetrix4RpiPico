@@ -3,8 +3,9 @@
 #include <span>
 #include <vector>
 
-inline std::vector<uint8_t>::iterator append_range(std::vector<uint8_t> & data, std::vector<uint8_t> extra) {
-    return data.insert(data.end(), extra.begin(), extra.end());
+inline std::vector<uint8_t>::iterator append_range(std::vector<uint8_t> &data,
+                                                   std::vector<uint8_t> extra) {
+  return data.insert(data.end(), extra.begin(), extra.end());
 }
 
 // Encode
@@ -15,7 +16,6 @@ std::vector<uint8_t> encode_u64(const uint64_t &value);
 std::vector<uint8_t> encode_i16(const int16_t &value);
 std::vector<uint8_t> encode_i32(const int32_t &value);
 std::vector<uint8_t> encode_i64(const int64_t &value);
-
 
 // std::vector<uint8_t> encode_float(const float &value);
 

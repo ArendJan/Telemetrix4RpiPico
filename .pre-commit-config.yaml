@@ -5,7 +5,7 @@ repos:
       hooks:
           - id: clang-format
             name: clang-format
-            entry: bash -c 'FILES=`find -type f -regex ".*\.\(cpp\|hpp\|h\|c\)$" -not -path "./build/*"`;  clang-format-14 --Werror $FILES -style=llvm -i'
+            entry: bash -c 'FILES=`find -type f -regex ".*\.\(cpp\|hpp\|h\|c\)$" -not -path "./build/*"`;  clang-format-18 --Werror $FILES -style=llvm -i'
             language: system
             types: [c]
             pass_filenames: false

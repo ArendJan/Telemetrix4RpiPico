@@ -5,7 +5,7 @@ class VEML6040_Sensor : public Sensor {
 public:
   VEML6040_Sensor(uint8_t settings[SENSORS_MAX_SETTINGS_A]);
   void readSensor();
-  void resetSensor(){};
+  void resetSensor() {};
 
 private:
   void init_sequence();

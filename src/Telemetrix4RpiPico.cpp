@@ -224,9 +224,9 @@ void send_debug_info(uint id, uint value) {
               msg.subspan<DEBUG_VALUE_HIGH_BYTE, sizeof(uint16_t)>().begin());
 
   // Assert are OK; Removed for speed;
-  // assert(debug_info_report_message[DEBUG_VALUE_HIGH_BYTE] == 
+  // assert(debug_info_report_message[DEBUG_VALUE_HIGH_BYTE] ==
   //        (value & 0xFF00) >> 8);
-  // assert(debug_info_report_message[DEBUG_VALUE_LOW_BYTE] == 
+  // assert(debug_info_report_message[DEBUG_VALUE_LOW_BYTE] ==
   //        (value & 0x00FF));
 
   serial_write((int *)debug_info_report_message,
@@ -1147,7 +1147,8 @@ void scan_analog_inputs() {
                         .begin());
 
         // Asserts check out; Removed for performance
-        // assert(analog_input_report_message[ANALOG_VALUE_HIGH_BYTE] == (value &
+        // assert(analog_input_report_message[ANALOG_VALUE_HIGH_BYTE] == (value
+        // &
         //        0xFF00) >> 8);
         // assert(analog_input_report_message[ANALOG_VALUE_LOW_BYTE] == value &
         //        0x00FF);
@@ -1200,7 +1201,7 @@ void scan_sonars() {
     sonar_report_message[M_WHOLE_VALUE] =
         (uint8_t)(distance >> 8); // high byte, not M
     sonar_report_message[CM_WHOLE_VALUE] =
-        (distance)&0xFF; // low byte, not CM anymore
+        (distance) & 0xFF; // low byte, not CM anymore
     serial_write(sonar_report_message, 5);
     sonar->last_time_diff = -1; // signal for next loop that there's no new data
   }

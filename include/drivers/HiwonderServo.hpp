@@ -301,7 +301,7 @@ public:
       min_angle_in_Ticks = 0;
       max_angle_in_Ticks = 1000;
       minCentDegrees = (min_angle_in_Ticks * 24) + staticOffset;
-      maxCentDegrees = ((max_angle_in_Ticks)*24) + staticOffset;
+      maxCentDegrees = ((max_angle_in_Ticks) * 24) + staticOffset;
       setLimitsTicks(min_angle_in_Ticks, max_angle_in_Ticks);
       move_time(newAngle, 0);
       // sleep_ms(500);
@@ -314,7 +314,7 @@ public:
     }
     setLimitsTicks(min_angle_in_Ticks, max_angle_in_Ticks);
     minCentDegrees = (min_angle_in_Ticks * 24) + staticOffset;
-    maxCentDegrees = ((max_angle_in_Ticks)*24) + staticOffset;
+    maxCentDegrees = ((max_angle_in_Ticks) * 24) + staticOffset;
     // if (abs(min_angle_cent_deg - minCentDegrees) > 24)
     // 	// Serial.println("FAULT Min angle desired was " +
     // String(min_angle_cent_deg) + " got " + String(minCentDegrees)); if
