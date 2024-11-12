@@ -23,6 +23,7 @@ add_executable(
   src/drivers/HiwonderServo.cpp
   src/drivers/INA226v2.cpp
   src/drivers/VL53L0.cpp
+  src/drivers/ICM20948.cpp
   src/drivers/neopixel.cpp
   src/module/Hiwonder_Servo.cpp
   src/module/PCA9685_Module.cpp
@@ -36,7 +37,8 @@ add_executable(
   src/sensors/mpu9250_sensor.cpp
   src/sensors/sensor.cpp
   src/sensors/veml6040_sensor.cpp
-  src/sensors/vl53l0x_sensor.cpp)
+  src/sensors/vl53l0x_sensor.cpp
+  src/sensors/ICM20948_sensor.cpp)
 find_package(Git REQUIRED)
 execute_process(
   COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD
