@@ -24,7 +24,6 @@ INA226_Sensor::INA226_Sensor(uint8_t sensor_data[SENSORS_MAX_SETTINGS_A]) {
 void INA226_Sensor::readSensor() {
   static uint32_t last_scan = 0;
   if (this->stop) {
-    send_debug_info(12, 14);
     return;
   }
   if (time_us_32() - last_scan <=

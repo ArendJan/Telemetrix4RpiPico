@@ -769,11 +769,9 @@ int encoder_report_message[] = {3, ENCODER_REPORT, 0, 0};
 int c = 0;
 void scan_encoders() {
   if (encoders.next_encoder_index < 1) {
-    send_debug_info(1, 1);
     return;
   }
   if (!mutex_try_enter(&encoders.mutex, NULL)) {
-    send_debug_info(1, 0);
     return;
   }
   if (c % 100 == 0) {
