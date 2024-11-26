@@ -12,7 +12,12 @@ public:
   void readModule();
   void writeModule(std::vector<uint8_t> &data);
   bool writeSingle(std::vector<uint8_t> &data, size_t i, bool single);
-  void resetModule() {};
+  void resetModule() {
+    for (auto &servo : this->servos) {
+      servo->motor_mode(0);
+      servo->disable();
+    }
+  };
 
   enum MessageType : uint8_t {
     // GET_ANGLE
@@ -35,6 +40,8 @@ public:
     OFFSET_READ = 8,
     // write voltage limits
     VOLTAGE_LIMIT_WRITE = 9,
+    // motor mode write
+    MOTOR_MODE_WRITE = 10,
   };
 
 private:
