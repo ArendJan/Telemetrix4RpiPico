@@ -175,6 +175,11 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
     uint32_t vMin = decode_u16(data_span.subspan<2, sizeof(uint16_t)>());
     uint32_t vMax = decode_u16(data_span.subspan<4, sizeof(uint16_t)>());
     this->servos[id]->setVoltageLimits(vMin, vMax);
+  } else if (msg_type == MOTOR_MODE_WRITE) { // motor mode write
+    auto id = data[1];
+    uint16_t speed = decode_i16(data_span.subspan<2, sizeof(uint16_t)>());
+    send_debug_info(10, speed);
+    this->servos[id]->motor_mode(speed);
   }
 }
 
