@@ -54,9 +54,14 @@ jobs:
             with:
                 files: Telemetrix4RpiPico.uf2
                 generate_release_notes: true
+          - name: Extract branch name
+            shell: bash
+            run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+            id: extract_branch
+              
           - name: Push to release
             uses: softprops/action-gh-release@v2
-            if: github.base_ref == 'refs/heads/develop' && github.repository == 'ArendJan/Telemetrix4RpiPico'
+            if: steps.extract_branch.outputs.branch == 'develop' && github.repository == 'ArendJan/Telemetrix4RpiPico'
             with:
                 files: Telemetrix4RpiPico.uf2
                 generate_release_notes: true
@@ -64,7 +69,7 @@ jobs:
                 prerelease: true
           - name: show vars
             run: |
-              echo "${{ github.base_ref }}"
+              echo "${{ steps.extract_branch.outputs.branch }}"
               echo "${{ github.repository }}"
     # upload_private_server:
     #   needs: [build-deploy] # 
