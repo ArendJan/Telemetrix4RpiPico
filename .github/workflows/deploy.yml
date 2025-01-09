@@ -54,6 +54,15 @@ jobs:
             with:
                 files: Telemetrix4RpiPico.uf2
                 generate_release_notes: true
+          - name: Push to release
+            uses: softprops/action-gh-release@v2
+            if: github.base_ref == 'refs/heads/develop' && github.repository == 'arend-jan/Telemetrix4RpiPico'
+            with:
+                files: Telemetrix4RpiPico.uf2
+                generate_release_notes: true
+                tag_name: rolling
+                prerelease: true
+
     # upload_private_server:
     #   needs: [build-deploy] # 
     #   runs-on: ubuntu-latest
