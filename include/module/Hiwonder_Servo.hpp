@@ -42,6 +42,8 @@ public:
     VOLTAGE_LIMIT_WRITE = 9,
     // motor mode write
     MOTOR_MODE_WRITE = 10,
+    // Add a servo
+    ADD_SERVO = 11,
   };
 
 private:

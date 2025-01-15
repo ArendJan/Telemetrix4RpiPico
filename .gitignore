@@ -5,6 +5,7 @@ build/
 .vscode/
 !.vsode/launch.json
 !.vscode/settings.json
+.cache
 test/
 build2/
 build_rel/
