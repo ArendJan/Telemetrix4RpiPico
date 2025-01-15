@@ -180,6 +180,22 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
     uint16_t speed = decode_i16(data_span.subspan<2, sizeof(uint16_t)>());
     send_debug_info(10, speed);
     this->servos[id]->motor_mode(speed);
+  } else if (msg_type == ADD_SERVO) {
+    // This is the actual servo ID
+    auto id = data[1];
+    auto servo = new HiwonderServo(this->bus, id);
+    servo->initialize();
+    // auto offset = servo->read_angle_offset();
+    this->servos.push_back(servo);
+    this->enabled_servos++;
+
+    servo->enable();
+    std::vector<uint8_t> data = {
+        ADD_SERVO,                          // add servo type
+        id,                                 // id
+        (uint8_t)(this->servos.size() - 1), // idx
+    };
+    this->publishData(data);
   }
 }
 
