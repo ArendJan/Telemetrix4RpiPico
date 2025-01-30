@@ -1,3 +1,6 @@
 [submodule "pico-ssd1306"]
 	path = pico-ssd1306
 	url = https://github.com/arendjan/pico-ssd1306.git
+[submodule "rp2040-serial-bootloader"]
+	path = rp2040-serial-bootloader
+	url = https://github.com/arendjan/rp2040-serial-bootloader.git

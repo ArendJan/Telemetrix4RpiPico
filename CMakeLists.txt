@@ -38,7 +38,8 @@ add_executable(
   src/sensors/mpu9250_sensor.cpp
   src/sensors/sensor.cpp
   src/sensors/veml6040_sensor.cpp
-  src/sensors/vl53l0x_sensor.cpp)
+  src/sensors/vl53l0x_sensor.cpp
+)
 find_package(Git REQUIRED)
 execute_process(
   COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD
@@ -74,7 +75,14 @@ target_link_libraries(
   hardware_spi
   hardware_flash
   pico_sync
-  pico_ssd1306)
+  pico_ssd1306
+)
+
+set(SKIP_BOOTLOADER_ENTRY_PIN 0)
+add_subdirectory(rp2040-serial-bootloader)
+# pico_set_linker_script(Telemetrix4RpiPico ${CMAKE_CURRENT_SOURCE_DIR}/blink_noboot2.ld)
+
+bootloader_build_combined(Telemetrix4RpiPico)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_custom_target(

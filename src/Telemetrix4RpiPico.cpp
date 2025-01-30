@@ -1612,6 +1612,7 @@ std::vector<Module *> modules;
 /***************************************************************
  *                  MAIN FUNCTION
  ****************************************************************/
+#define ENTRY_MAGIC 0xb105f00d
 
 int main() {
   // gpio_init(14);
@@ -1627,6 +1628,17 @@ int main() {
   stdio_set_translate_crlf(&stdio_uart, false);
 #endif
   stdio_flush();
+  while(true) {
+    led_debug(10, 400);
+    hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
+	watchdog_hw->scratch[5] = ENTRY_MAGIC;
+	watchdog_hw->scratch[6] = ~ENTRY_MAGIC;
+	watchdog_reboot(0, 0, 0);
+
+	while (1) {
+		tight_loop_contents();
+	}
+  }
   check_uart_loopback(); // Mirte-master has pin 0 and 1 tied together, then
                          // don't want to use it
   adc_init();
