@@ -228,3 +228,4 @@ extern void led_debug(int blinks, uint delay);
 
 void get_id();
 void set_id();
+void reset_to_bootloader();

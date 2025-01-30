@@ -196,7 +196,8 @@ command_descriptor command_table[] = {{&serial_loopback},
                                       {&module_new},
                                       {&module_data},
                                       {&get_id},
-                                      {&set_id}};
+                                      {&set_id},
+                                      {&reset_to_bootloader}};
 
 /***************************************************************************
  *                   DEBUGGING FUNCTIONS
@@ -1487,6 +1488,18 @@ void read_dht(uint dht_pin) {
   serial_write(dht_report_message, 7);
 }
 
+#define ENTRY_MAGIC 0xb105f00d
+void reset_to_bootloader() {
+    hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
+	watchdog_hw->scratch[5] = ENTRY_MAGIC;
+	watchdog_hw->scratch[6] = ~ENTRY_MAGIC;
+	watchdog_reboot(0, 0, 0);
+
+	while (1) {
+		tight_loop_contents();
+  }
+}
+
 #include "hardware/flash.h"
 
 #define FLASH_TARGET_OFFSET (256 * 1024)
@@ -1612,7 +1625,6 @@ std::vector<Module *> modules;
 /***************************************************************
  *                  MAIN FUNCTION
  ****************************************************************/
-#define ENTRY_MAGIC 0xb105f00d
 
 int main() {
   // gpio_init(14);
@@ -1628,17 +1640,6 @@ int main() {
   stdio_set_translate_crlf(&stdio_uart, false);
 #endif
   stdio_flush();
-  while(true) {
-    led_debug(10, 400);
-    hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
-	watchdog_hw->scratch[5] = ENTRY_MAGIC;
-	watchdog_hw->scratch[6] = ~ENTRY_MAGIC;
-	watchdog_reboot(0, 0, 0);
-
-	while (1) {
-		tight_loop_contents();
-	}
-  }
   check_uart_loopback(); // Mirte-master has pin 0 and 1 tied together, then
                          // don't want to use it
   adc_init();
