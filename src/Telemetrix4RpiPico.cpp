@@ -1547,7 +1547,6 @@ void check_uart_loopback() {
   uart_init(UART_ID, BAUD_RATE);
   gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
   gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
-  // uart_putc_raw(UART_ID, 'A');
 
   // If we read back the same message as sent, then there is a loopback
   // and disable the uart for normal Telemetrix communication.
@@ -1567,7 +1566,6 @@ void check_uart_loopback() {
     read_byte = uart_getc(UART_ID);
     if (read_byte == test_message) {
       uart_enabled = false;
-      // led_debug(50, 100);
       return;
     }
   }
