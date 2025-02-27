@@ -14,6 +14,8 @@ endif()
 
 project(Telemetrix4RpiPico)
 pico_sdk_init()
+set(PICO_USE_FASTEST_SUPPORTED_CLOCK 100)
+
 add_executable(
   Telemetrix4RpiPico
   src/Telemetrix4RpiPico.cpp
