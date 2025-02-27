@@ -1,108 +1,5 @@
-//
-// Created by afy on 3/3/21.
-//
-
-#ifndef TELEMETRIX4RPIPICO_TELEMETRIX4RPIPICO_H
-#define TELEMETRIX4RPIPICO_TELEMETRIX4RPIPICO_H
-
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "EndlessLoop"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include "pico/stdlib.h"
-#include "hardware/pwm.h"
-#include "pico/unique_id.h"
-#include "hardware/watchdog.h"
-#include "hardware/adc.h"
-#include "hardware/i2c.h"
-#include "hardware/pio.h"
-#include "hardware/clocks.h"
-#include "hardware/spi.h"
-#include "Telemetrix4RpiPico.pio.h"
-#include "math.h"
-
-/************************** FORWARD REFERENCES ***********************
-We define all functions here as extern to provide allow
-forward referencing.
-**********************************************************************/
-
-extern void serial_loopback();
-
-extern void set_pin_mode();
-
-extern void digital_write();
-
-extern void pwm_write();
-
-extern void modify_reporting();
-
-extern void get_firmware_version();
-
-extern void get_pico_unique_id();
-
-extern void servo_attach();
-
-extern void servo_write();
-
-extern void servo_detach();
-
-extern void i2c_begin();
-
-extern void i2c_read();
-
-extern void i2c_write();
-
-extern void sonar_new();
-
-extern void serial_write(const int *buffer, int num_of_bytes_to_send);
-
-extern void led_debug(int blinks, uint delay);
-
-extern void send_debug_info(uint id, uint value);
-
-extern void dht_new();
-
-extern void stop_all_reports();
-
-extern void enable_all_reports();
-
-extern void reset_data();
-
-extern void reset_board();
-
-extern void scan_digital_inputs();
-
-extern void scan_analog_inputs();
-
-extern void init_neo_pixels();
-
-extern void show_neo_pixels();
-
-extern void set_neo_pixel();
-
-extern void clear_all_neo_pixels();
-
-extern void fill_neo_pixels();
-
-extern void read_sonar(uint);
-
-extern void read_dht(uint);
-
-extern void init_spi();
-
-extern void read_blocking_spi();
-
-extern void write_blocking_spi();
-
-extern void spi_cs_control();
-
-extern void set_format_spi();
-
-extern void set_scan_delay();
-
-void encoder_new();
-
+#pragma once
+#include "pico/types.h"
 /*********************************************************
  *                       COMMAND DEFINES
  ********************************************************/
@@ -110,37 +7,83 @@ void encoder_new();
 // Commands -received by this sketch
 // Add commands retaining the sequential numbering.
 // The order of commands here must be maintained in the command_table below.
-#define SERIAL_LOOP_BACK 0
-#define SET_PIN_MODE 1
-#define DIGITAL_WRITE 2
-#define PWM_WRITE 3
-#define MODIFY_REPORTING 4 // mode(all, analog, or digital), pin, enable or disable
-#define GET_FIRMWARE_VERSION 5
-#define GET_PICO_UNIQUE_ID 6
-#define SERVO_ATTACH 7 // unused
-#define SERVO_WRITE 8  // unused
-#define SERVO_DETACH 9 // unused
-#define I2C_BEGIN 10
-#define I2C_READ 11
-#define I2C_WRITE 12
-#define SONAR_NEW 13
-#define DHT_NEW 14
-#define STOP_ALL_REPORTS 15
-#define ENABLE_ALL_REPORTS 16
-#define RESET_DATA 17
-#define RESET_BOARD 18
-#define INITIALIZE_NEO_PIXELS 19
-#define SHOW_NEO_PIXELS 20
-#define SET_NEO_PIXEL 21
-#define CLEAR_ALL_NEO_PIXELS 22
-#define FILL_NEO_PIXELS 23
-#define SPI_INIT 24
-#define SPI_WRITE_BLOCKING 25
-#define SPI_READ_BLOCKING 26
-#define SPI_SET_FORMAT 27
-#define SPI_CS_CONTROL 28
-#define SET_SCAN_DELAY 29
-#define ENCODER_NEW 30
+// #define SERIAL_LOOP_BACK 0
+// #define SET_PIN_MODE 1
+// #define DIGITAL_WRITE 2
+// #define PWM_WRITE 3
+// #define MODIFY_REPORTING \
+//   4 // mode(all, analog, or digital), pin, enable or disable
+// #define GET_FIRMWARE_VERSION 5
+// #define GET_PICO_UNIQUE_ID 6
+// #define SERVO_ATTACH 7 // unused
+// #define SERVO_WRITE 8  // unused
+// #define SERVO_DETACH 9 // unused
+// #define I2C_BEGIN 10
+// #define I2C_READ 11
+// #define I2C_WRITE 12
+// #define SONAR_NEW 13
+// #define DHT_NEW 14
+// #define STOP_ALL_REPORTS 15
+// #define ENABLE_ALL_REPORTS 16
+// #define RESET_DATA 17
+// #define RESET_BOARD 18
+// #define INITIALIZE_NEO_PIXELS 19
+// #define SHOW_NEO_PIXELS 20
+// #define SET_NEO_PIXEL 21
+// #define CLEAR_ALL_NEO_PIXELS 22
+// #define FILL_NEO_PIXELS 23
+// #define SPI_INIT 24
+// #define SPI_WRITE_BLOCKING 25
+// #define SPI_READ_BLOCKING 26
+// #define SPI_SET_FORMAT 27
+// #define SPI_CS_CONTROL 28
+// #define SET_SCAN_DELAY 29
+// #define ENCODER_NEW 30
+// const int SENSOR_NEW = 31;
+// const int GET_ID = 35;
+// const int SET_ID = 36;
+
+// #pragma once
+
+enum MESSAGE_IN_TYPE {
+  SERIAL_LOOP_BACK = 0,
+  SET_PIN_MODE = 1,
+  DIGITAL_WRITE = 2,
+  PWM_WRITE = 3,
+  MODIFY_REPORTING = 4,
+  GET_FIRMWARE_VERSION = 5,
+  GET_PICO_UNIQUE_ID = 6,
+  SERVO_ATTACH = 7,
+  SERVO_WRITE = 8,
+  SERVO_DETACH = 9, // = unused
+  I2C_BEGIN = 10,
+  I2C_READ = 11,
+  I2C_WRITE = 12,
+  SONAR_NEW = 13,
+  DHT_NEW = 14,
+  STOP_ALL_REPORTS = 15,
+  ENABLE_ALL_REPORTS = 16,
+  RESET_DATA = 17,
+  RESET_BOARD = 18,
+  INITIALIZE_NEO_PIXELS = 19,
+  SHOW_NEO_PIXELS = 20,
+  SET_NEO_PIXEL = 21,
+  CLEAR_ALL_NEO_PIXELS = 22,
+  FILL_NEO_PIXELS = 23,
+  SPI_INIT = 24,
+  SPI_WRITE_BLOCKING = 25,
+  SPI_READ_BLOCKING = 26,
+  SPI_SET_FORMAT = 27,
+  SPI_CS_CONTROL = 28,
+  SET_SCAN_DELAY = 29,
+  ENCODER_NEW = 30,
+  SENSOR_NEW = 31,
+  GET_ID = 35,
+  SET_ID = 36,
+  FEATURE_CHECK = 37,
+  MAX_IN_MESSAGE_TYPE
+};
+
 /*****************************************************
  *                  MESSAGE OFFSETS
  ***************************************************/
@@ -326,11 +269,7 @@ const uint DHT_MAX_TIMINGS = 85;
 // Max encoder devices
 #define MAX_ENCODERS 4
 
-typedef enum
-{
-    SINGLE = 1,
-    QUADRATURE = 2
-} ENCODER_TYPES;
+typedef enum { SINGLE = 1, QUADRATURE = 2 } ENCODER_TYPES;
 
 // encoder reports are identified by pin A
 #define ENCODER_REPORT_PIN_A 2
@@ -369,34 +308,61 @@ typedef enum
 /******************************************************
  *                 PIN MODE DEFINITIONS
  *****************************************************/
-#define DIGITAL_INPUT 0
-#define DIGITAL_OUTPUT 1
-#define PWM_OUTPUT 2
-#define DIGITAL_INPUT_PULL_UP 3
-#define DIGITAL_INPUT_PULL_DOWN 4
-#define ANALOG_INPUT 5
-#define SONAR 7
-#define DHT 8
 
+enum PIN_MODES {
+  NOT_SET = 255,
+  INPUT = 0,
+  OUTPUT = 1,
+  PWM = 2,
+  INPUT_PULL_UP = 3,
+  INPUT_PULL_DOWN = 4,
+  ANALOG_INPUT = 5,
+  SONAR_MODE = 7,
+  DHT_MODE = 8
+};
 #define PIN_MODE_NOT_SET 255
 
 /**************************************************
  *               REPORT DEFINITIONS
  **************************************************/
-#define SERIAL_LOOP_BACK_REPORT 0
-#define DIGITAL_REPORT 2
-#define ANALOG_REPORT 3
-#define FIRMWARE_REPORT 5
-#define REPORT_PICO_UNIQUE_ID 6
-#define SERVO_UNAVAILABLE 7 // for the future
-#define I2C_WRITE_REPORT 8
-#define I2C_READ_FAILED 9
-#define I2C_READ_REPORT 10
-#define SONAR_DISTANCE 11
-#define DHT_REPORT 12
-#define SPI_REPORT 13
-#define ENCODER_REPORT 14
-#define DEBUG_PRINT 99
+// #define SERIAL_LOOP_BACK_REPORT 0
+// #define DIGITAL_REPORT 2
+// #define ANALOG_REPORT 3
+// #define FIRMWARE_REPORT 5
+// #define REPORT_PICO_UNIQUE_ID 6
+// #define SERVO_UNAVAILABLE 7 // for the future
+// #define I2C_WRITE_REPORT 8
+// #define I2C_READ_FAILED 9
+// #define I2C_READ_REPORT 10
+// #define SONAR_DISTANCE 11
+// #define DHT_REPORT 12
+// #define SPI_REPORT 13
+// #define ENCODER_REPORT 14
+// #define DEBUG_PRINT 99
+// const int SENSOR_REPORT = 20;
+// const int PONG_REPORT = 32;
+// const int MODULE_REPORT = 34;
+
+enum MESSAGE_OUT_TYPE {
+  SERIAL_LOOP_BACK_REPORT = 0,
+  DIGITAL_REPORT = 2,
+  ANALOG_REPORT = 3,
+  FIRMWARE_REPORT = 5,
+  REPORT_PICO_UNIQUE_ID = 6,
+  SERVO_UNAVAILABLE = 7, // for the future
+  I2C_WRITE_REPORT = 8,
+  I2C_READ_FAILED = 9,
+  I2C_READ_REPORT = 10,
+  SONAR_DISTANCE = 11,
+  DHT_REPORT = 12,
+  SPI_REPORT = 13,
+  ENCODER_REPORT = 14,
+  DEBUG_PRINT = 99,
+  SENSOR_REPORT = 20,
+  PONG_REPORT = 32,
+  MODULE_REPORT = 34,
+  MAX_OUT_MESSAGE_TYPE
+};
 
 /***************************************************************
  *          INPUT PIN REPORTING CONTROL SUB COMMANDS
@@ -413,89 +379,10 @@ typedef enum
 
 /* Firmware Version Values */
 #define FIRMWARE_MAJOR 1
-#define FIRMWARE_MINOR 2
+#define FIRMWARE_MINOR 3
 
 // maximum length of a command packet in bytes
 #define MAX_COMMAND_LENGTH 30
 
 // Indicator that no i2c register is being specified in the command
 #define I2C_NO_REGISTER_SPECIFIED 254
-
-// a descriptor for digital pins
-typedef struct
-{
-    uint pin_number;
-    uint pin_mode;
-    uint reporting_enabled; // If true, then send reports if an input pin
-    int last_value;         // Last value read for input mode
-} pin_descriptor;
-
-// a descriptor for analog pins
-typedef struct analog_pin_descriptor
-{
-    uint reporting_enabled; // If true, then send reports if an input pin
-    int last_value;         // Last value read for input mode
-    int differential;       // difference between current and last value needed
-} analog_pin_descriptor;
-
-// This structure describes an HC-SR04 type device
-typedef struct hc_sr04_descriptor
-{
-    uint trig_pin; // trigger pin
-    uint echo_pin; // echo pin
-    uint32_t start_time;
-    uint32_t last_time_diff;
-} hc_sr04_descriptor;
-
-// this structure holds an index into the sonars array
-// and the sonars array
-typedef struct sonar_data
-{
-    int next_sonar_index;
-    repeating_timer_t trigger_timer;
-    uint32_t trigger_mask;
-    hc_sr04_descriptor sonars[MAX_SONARS];
-} sonar_data;
-
-// this structure describes a DHT type device
-typedef struct dht_descriptor
-{
-    uint data_pin; // data pin
-    absolute_time_t previous_time;
-    /* for possible future use
-    int last_val_whole; // value on right side of decimal
-    int last_val_frac; // value on left side of decimal
-    */
-} dht_descriptor;
-
-// this structure holds an index into the dht array
-// and the dhts array
-typedef struct dht_data
-{
-    int next_dht_index;
-    dht_descriptor dhts[MAX_DHTS];
-} dht_data;
-
-// encoder type
-typedef struct
-{
-    ENCODER_TYPES type;
-    int A;
-    int B;
-    int8_t step;
-    int last_state;
-} encoder_t;
-
-typedef struct
-{
-    int next_encoder_index;
-    repeating_timer_t trigger_timer;
-    encoder_t encoders[MAX_ENCODERS];
-} encoder_data;
-encoder_data encoders;
-typedef struct
-{
-    // a pointer to the command processing function
-    void (*command_func)(void);
-} command_descriptor;
-#endif // TELEMETRIX4RPIPICO_TELEMETRIX4RPIPICO_H
