@@ -141,7 +141,6 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
                                      max / 24); // 24 centidegrees per tick
   } else if (msg_type == RANGE_READ) {
     // read range of servo stored in servo
-    
 
     auto id = data[1];
     // send_debug_info(10, id);
@@ -162,14 +161,16 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
     // TODO: Maybe i16 decode instead
     int16_t offset = (int16_t)decode_i16(
         data_span.subspan<2, sizeof(int16_t)>()); //((int16_t)data[2] << 8) |
-                                                   // data[3];
+                                                  // data[3];
     offset /= 24;
     this->servos[id]->angle_offset_adjust(offset);
     this->servos[id]->angle_offset_save();
   } else if (msg_type == OFFSET_READ) {
     auto id = data[1];
-    int16_t offset = (int8_t)this->servos[id]->read_angle_offset(); // read back as uint8_t, but is signed.
-    offset*=24;
+    int16_t offset =
+        (int8_t)this->servos[id]
+            ->read_angle_offset(); // read back as uint8_t, but is signed.
+    offset *= 24;
     std::vector<uint8_t> data = {OFFSET_READ, // offset type
                                  id};         // id
 
