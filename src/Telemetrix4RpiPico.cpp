@@ -160,43 +160,44 @@ int dht_report_message[] = {
  The command_func is a pointer the command's function.
  ****************************************************************/
 // An array of pointers to the command functions
-command_descriptor command_table[] = {{&serial_loopback},
-                                      {&set_pin_mode},
-                                      {&digital_write},
-                                      {&pwm_write},
-                                      {&modify_reporting},
-                                      {&get_firmware_version},
-                                      {&get_pico_unique_id},
-                                      {&servo_attach},
-                                      {&servo_write},
-                                      {&servo_detach},
-                                      {&i2c_begin},
-                                      {&i2c_read},
-                                      {&i2c_write},
-                                      {&sonar_new},
-                                      {&dht_new},
-                                      {&stop_all_reports},
-                                      {&enable_all_reports},
-                                      {&reset_data},
-                                      {&reset_board},
-                                      {&init_neo_pixels},
-                                      {&show_neo_pixels},
-                                      {&set_neo_pixel},
-                                      {&clear_all_neo_pixels},
-                                      {&fill_neo_pixels},
-                                      {&init_spi},
-                                      {&write_blocking_spi},
-                                      {&read_blocking_spi},
-                                      {&set_format_spi},
-                                      {&spi_cs_control},
-                                      {&set_scan_delay},
-                                      {&encoder_new},
-                                      {&sensor_new},
-                                      {&ping},
-                                      {&module_new},
-                                      {&module_data},
-                                      {&get_id},
-                                      {&set_id}};
+constexpr command_descriptor command_table[] = {{&serial_loopback},
+                                                {&set_pin_mode},
+                                                {&digital_write},
+                                                {&pwm_write},
+                                                {&modify_reporting},
+                                                {&get_firmware_version},
+                                                {&get_pico_unique_id},
+                                                {&servo_attach},
+                                                {&servo_write},
+                                                {&servo_detach},
+                                                {&i2c_begin},
+                                                {&i2c_read},
+                                                {&i2c_write},
+                                                {&sonar_new},
+                                                {&dht_new},
+                                                {&stop_all_reports},
+                                                {&enable_all_reports},
+                                                {&reset_data},
+                                                {&reset_board},
+                                                {&init_neo_pixels},
+                                                {&show_neo_pixels},
+                                                {&set_neo_pixel},
+                                                {&clear_all_neo_pixels},
+                                                {&fill_neo_pixels},
+                                                {&init_spi},
+                                                {&write_blocking_spi},
+                                                {&read_blocking_spi},
+                                                {&set_format_spi},
+                                                {&spi_cs_control},
+                                                {&set_scan_delay},
+                                                {&encoder_new},
+                                                {&sensor_new},
+                                                {&ping},
+                                                {&module_new},
+                                                {&module_data},
+                                                {&get_id},
+                                                {&set_id},
+                                                {&reset_to_bootloader}};
 
 /***************************************************************************
  *                   DEBUGGING FUNCTIONS
@@ -1487,6 +1488,18 @@ void read_dht(uint dht_pin) {
   serial_write(dht_report_message, 7);
 }
 
+#define ENTRY_MAGIC 0xb105f00d
+void reset_to_bootloader() {
+  hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
+  watchdog_hw->scratch[5] = ENTRY_MAGIC;
+  watchdog_hw->scratch[6] = ~ENTRY_MAGIC;
+  watchdog_reboot(0, 0, 0);
+
+  while (1) {
+    tight_loop_contents();
+  }
+}
+
 #include "hardware/flash.h"
 
 #define FLASH_TARGET_OFFSET (256 * 1024)
@@ -1534,7 +1547,6 @@ void check_uart_loopback() {
   uart_init(UART_ID, BAUD_RATE);
   gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
   gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
-  // uart_putc_raw(UART_ID, 'A');
 
   // If we read back the same message as sent, then there is a loopback
   // and disable the uart for normal Telemetrix communication.
@@ -1554,7 +1566,6 @@ void check_uart_loopback() {
     read_byte = uart_getc(UART_ID);
     if (read_byte == test_message) {
       uart_enabled = false;
-      // led_debug(50, 100);
       return;
     }
   }
@@ -1690,3 +1701,11 @@ int main() {
     }
   }
 }
+
+// Just some checks to make sure the arrays are not changed
+static_assert(sizeof(command_buffer) == 30,
+              "Command buffer size is not 30 bytes");
+static_assert(command_table[3].command_func == &pwm_write,
+              "Command table is not correct");
+static_assert(command_table[37].command_func == &reset_to_bootloader,
+              "Command table is not correct");

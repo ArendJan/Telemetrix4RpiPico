@@ -18,17 +18,17 @@ std::vector<uint8_t> encode_u64(const uint64_t &value) {
 }
 
 std::vector<uint8_t> encode_i16(const int16_t &value) {
-  auto converted = *reinterpret_cast<uint16_t *>(value);
+  auto converted = *reinterpret_cast<const uint16_t *>(&value);
   return encode_u16(converted);
 }
 
 std::vector<uint8_t> encode_i32(const int32_t &value) {
-  auto converted = *reinterpret_cast<uint32_t *>(value);
+  auto converted = *reinterpret_cast<const uint32_t *>(&value);
   return encode_u32(converted);
 }
 
 std::vector<uint8_t> encode_i64(const int64_t &value) {
-  auto converted = *reinterpret_cast<uint64_t *>(value);
+  auto converted = *reinterpret_cast<const uint64_t *>(&value);
   return encode_u64(converted);
 }
 

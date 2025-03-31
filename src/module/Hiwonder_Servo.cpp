@@ -141,7 +141,10 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
                                      max / 24); // 24 centidegrees per tick
   } else if (msg_type == RANGE_READ) {
     // read range of servo stored in servo
+
     auto id = data[1];
+    // send_debug_info(10, id);
+    // send_debug_info(11, this->servos.size());
     this->servos[id]->readLimits();
     auto min = this->servos[id]->minCentDegrees;
     auto max = this->servos[id]->maxCentDegrees;
@@ -156,18 +159,22 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
   } else if (msg_type == OFFSET_WRITE) { // Set offset in centideg
     auto id = data[1];
     // TODO: Maybe i16 decode instead
-    int16_t offset = (int16_t)decode_u16(
-        data_span.subspan<2, sizeof(uint16_t)>()); //((int16_t)data[2] << 8) |
-                                                   // data[3];
+    int16_t offset = (int16_t)decode_i16(
+        data_span.subspan<2, sizeof(int16_t)>()); //((int16_t)data[2] << 8) |
+                                                  // data[3];
     offset /= 24;
     this->servos[id]->angle_offset_adjust(offset);
     this->servos[id]->angle_offset_save();
   } else if (msg_type == OFFSET_READ) {
     auto id = data[1];
-    auto offset = this->servos[id]->read_angle_offset() * 24;
+    int16_t offset =
+        (int8_t)this->servos[id]
+            ->read_angle_offset(); // read back as uint8_t, but is signed.
+    offset *= 24;
     std::vector<uint8_t> data = {OFFSET_READ, // offset type
                                  id};         // id
-    append_range(data, encode_u16(offset));
+
+    append_range(data, encode_i16(offset));
     this->publishData(data);
   } else if (msg_type == VOLTAGE_LIMIT_WRITE) { // write voltage limits
     auto id = data[1];
@@ -178,8 +185,23 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
   } else if (msg_type == MOTOR_MODE_WRITE) { // motor mode write
     auto id = data[1];
     uint16_t speed = decode_i16(data_span.subspan<2, sizeof(uint16_t)>());
-    send_debug_info(10, speed);
     this->servos[id]->motor_mode(speed);
+  } else if (msg_type == ADD_SERVO) {
+    // This is the actual servo ID
+    auto id = data[1];
+    auto servo = new HiwonderServo(this->bus, id);
+    servo->initialize();
+    // auto offset = servo->read_angle_offset();
+    this->servos.push_back(servo);
+    this->enabled_servos++;
+    send_debug_info(13, this->enabled_servos);
+    servo->enable();
+    std::vector<uint8_t> data = {
+        ADD_SERVO,                          // add servo type
+        id,                                 // id
+        (uint8_t)(this->servos.size() - 1), // idx
+    };
+    this->publishData(data);
   }
 }
 
