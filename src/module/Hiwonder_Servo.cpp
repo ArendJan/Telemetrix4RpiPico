@@ -168,9 +168,8 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
     this->servos[id]->angle_offset_save();
   } else if (msg_type == OFFSET_READ) {
     auto id = data[1];
-    send_debug_info(15, id);
-    auto offset = this->servos[id]->read_angle_offset() * 24;
-    send_debug_info(16, offset);
+    int16_t offset = (int8_t)this->servos[id]->read_angle_offset(); // read back as uint8_t, but is signed.
+    offset*=24;
     std::vector<uint8_t> data = {OFFSET_READ, // offset type
                                  id};         // id
 
@@ -185,7 +184,6 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
   } else if (msg_type == MOTOR_MODE_WRITE) { // motor mode write
     auto id = data[1];
     uint16_t speed = decode_i16(data_span.subspan<2, sizeof(uint16_t)>());
-    send_debug_info(10, speed);
     this->servos[id]->motor_mode(speed);
   } else if (msg_type == ADD_SERVO) {
     // This is the actual servo ID
