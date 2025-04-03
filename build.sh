@@ -7,7 +7,6 @@ cd build2
 # Sometimes the debug build reports more errors than Release
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make
-mv Telemetrix4RpiPico_combined.uf2 Telemetrix4RpiPico.uf2
 cd ..
 # rm -rf build2
 # mkdir build2
