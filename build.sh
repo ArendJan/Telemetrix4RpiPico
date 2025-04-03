@@ -6,7 +6,7 @@ ls
 cd build2
 # Sometimes the debug build reports more errors than Release
 cmake -DCMAKE_BUILD_TYPE=Release ..
-make
+make -j
 cd ..
 # rm -rf build2
 # mkdir build2
