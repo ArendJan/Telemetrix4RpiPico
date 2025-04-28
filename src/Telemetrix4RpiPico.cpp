@@ -1308,33 +1308,69 @@ void readSensors() {
 /***********************************************/
 /***************MODULES*************************/
 void module_new() {
-  const MODULE_TYPES type = (MODULE_TYPES)command_buffer[2];
-  const uint8_t module_num = command_buffer[1];
-  std::vector<uint8_t> data;
-  data.insert(data.end(), &command_buffer[3], &command_buffer[packet_size]);
-  // std::copy(command_buffer + 3, command_buffer + 3 + data_size,
-  //           sensor_data);
-  if (type >= MODULE_TYPES::MAX_MODULES) {
-    return;
-  }
-  Module *module = nullptr;
-  if (type == MODULE_TYPES::PCA9685) {
-    module = new PCA9685_Module(data);
-  } else if (type == MODULE_TYPES::HIWONDER_SERVO) {
-    module = new Hiwonder_Servo(data);
-  } else if (type == MODULE_TYPES::SHUTDOWN_RELAY) {
-    return; // not implemented
-    // module = new Shutdown_Relay(data);
-  } else if (type == MODULE_TYPES::TMX_SSD1306) {
-    module = new TmxSSD1306(data);
-  } else {
-    return;
-  }
+  const auto msg_type = command_buffer[1];
+  const std::vector<std::pair<MODULE_TYPES, std::function<Module *( std::vector<uint8_t>&)>>> module_funcs =
+      {
+          {MODULE_TYPES::PCA9685, [](std::vector<uint8_t>& data) { return new PCA9685_Module(data); }},
+          {MODULE_TYPES::HIWONDER_SERVO, []( std::vector<uint8_t>& data) { return new Hiwonder_Servo(data); }},
+          // {MODULE_TYPES::SHUTDOWN_RELAY, [](const std::vector<uint8_t>& data) { return nullptr; /* not implemented */ }},
+          {MODULE_TYPES::TMX_SSD1306, []( std::vector<uint8_t>& data) { return new TmxSSD1306(data); }},
+      };
 
-  module->type = type;
-  module->num = module_num;
+  if(msg_type==1) {
+    const MODULE_TYPES type = (MODULE_TYPES)command_buffer[3];
+    const uint8_t module_num = command_buffer[2];
+    std::vector<uint8_t> data;
+    data.insert(data.end(), &command_buffer[4], &command_buffer[packet_size]);
 
-  modules.push_back(module);
+    if (type >= MODULE_TYPES::MAX_MODULES) {
+      return;
+    }
+    Module *module = nullptr;
+    // if (type == MODULE_TYPES::PCA9685) {
+    //   module = new PCA9685_Module(data);
+    // } else if (type == MODULE_TYPES::HIWONDER_SERVO) {
+    //   module = new Hiwonder_Servo(data);
+    // } else if (type == MODULE_TYPES::SHUTDOWN_RELAY) {
+    //   return; // not implemented
+    //   // module = new Shutdown_Relay(data);
+    // } else if (type == MODULE_TYPES::TMX_SSD1306) {
+    //   module = new TmxSSD1306(data);
+    // } else {
+    //   return;
+    // }
+    for (const auto& [module_type, func] : module_funcs) {
+      if (module_type == type) {
+        module = func(data);
+        break;
+      }
+    }
+    if (module == nullptr) {
+      return; // module not found
+    }
+    module->type = type;
+    module->num = module_num;
+
+    modules.push_back(module);
+  } else if(msg_type==0) { // check module type feature detection
+    bool found = false;
+    const uint8_t module_type_target = command_buffer[2];
+    for(const auto& [module_type, func] : module_funcs) {
+      send_debug_info(10, module_type);
+      if (module_type == module_type_target && func != nullptr) {
+        found = true;
+        break;
+      }
+    }
+    send_debug_info(10, found);
+    serial_write({
+      0, // packet length
+      MODULE_REPORT,
+      0, // feature check
+      module_type_target,
+      found ? 1 : 0
+  });
+  }
 }
 
 void module_data() {
@@ -1558,11 +1594,12 @@ void feature_detect() {
     serial_write(id_msg);
     return;
   }
+  send_debug_info(41, feature_id);
+  send_debug_info(40, command_table[feature_id].command_func == nullptr);
   if(command_table[feature_id].command_func == nullptr) {
-    // id_msg[0] = 2;
+    
     id_msg[3] = 0;
   } else {
-    // id_msg[0] = 2;
     id_msg[3] = 1;
   }
   // TODO: add more features for specific types:
@@ -1752,4 +1789,8 @@ static_assert(sizeof(command_buffer) == 30,
 static_assert(command_table[3].command_func == &pwm_write,
               "Command table is not correct");
 static_assert(command_table[38].command_func == &reset_to_bootloader,
+              "Command table is not correct");
+static_assert(command_table[33].command_func == &module_new,
+              "Command table is not correct");
+static_assert(command_table[27].command_func == &set_format_spi,
               "Command table is not correct");

@@ -45,7 +45,7 @@
 
 // #pragma once
 
-enum MESSAGE_IN_TYPE {
+enum MESSAGE_IN_TYPE { // completely unused, TODO for command table
   SERIAL_LOOP_BACK = 0,
   SET_PIN_MODE = 1,
   DIGITAL_WRITE = 2,
@@ -361,7 +361,7 @@ enum MESSAGE_OUT_TYPE {
   DEBUG_PRINT = 99,
   SENSOR_REPORT = 20,
   PONG_REPORT = 32,
-  MODULE_REPORT = 34,
+  MODULE_REPORT = 33,
   MAX_OUT_MESSAGE_TYPE
 };
 

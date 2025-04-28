@@ -262,6 +262,9 @@ The servo messages, types 7-9, are not supported (yet), as servos can be used wi
 
 
 ## Modules
+
+TODO: add module init & feature checking
+
 ### Hiwonder:
 Servos are identified based on an id. The actual servo id is only transmitted at init, after that the index of the servo in the init list is used to offload id searching from the pico to the computer.
 #### Init:
