@@ -75,6 +75,19 @@ Receive:
 [SET_ID_REPORT = 36, id]
 ```
 
+### Feature detection
+Check that some message types are supported. Additional data can be sent back when the feature is available, like the max sonar count.
+
+Send:
+```py
+[FEATURE_REQUEST = 37, MSG_TYPE]
+```
+
+Receive:
+```py
+[FEATURE_REQUEST_REPORT = 37, MSG_TYPE, OK, ...MSG_DATA]
+```
+
 
 ### I2C
 
@@ -106,9 +119,16 @@ Receive:
 
 Register can be 0xFE
 
+
+TODO: moet meer dan alleen register worden, ook langere berichten
 Send
 ```py
 [I2C_READ, i2c_port, i2c_addr, cust_message_id, register, num_bytes, no_stop]
+```
+
+Receive:
+```py
+[I2C_READ_REPORT = 10,  i2c_port, cust_message_id, read_return_value, num_bytes, data]
 ```
 
 ## Sensors

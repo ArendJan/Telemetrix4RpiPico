@@ -103,6 +103,8 @@ extern void set_format_spi();
 
 extern void set_scan_delay();
 
+void feature_detect();
+
 void encoder_new();
 
 void check_uart_loopback();

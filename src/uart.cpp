@@ -14,6 +14,7 @@ void serial_write(const int *buffer, int num_of_bytes_to_send) {
 }
 
 void serial_write(std::vector<uint8_t> data) {
+  data[0] = data.size() - 1; 
   // stdio_out_chars_crlf((char *)data.data(), data.size());
   // stdio_usb.out_chars((char *)data.data(), data.size());
   for (auto byte : data) {

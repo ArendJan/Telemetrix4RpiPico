@@ -160,44 +160,53 @@ int dht_report_message[] = {
  The command_func is a pointer the command's function.
  ****************************************************************/
 // An array of pointers to the command functions
-constexpr command_descriptor command_table[] = {{&serial_loopback},
-                                                {&set_pin_mode},
-                                                {&digital_write},
-                                                {&pwm_write},
-                                                {&modify_reporting},
-                                                {&get_firmware_version},
-                                                {&get_pico_unique_id},
-                                                {&servo_attach},
-                                                {&servo_write},
-                                                {&servo_detach},
-                                                {&i2c_begin},
-                                                {&i2c_read},
-                                                {&i2c_write},
-                                                {&sonar_new},
-                                                {&dht_new},
-                                                {&stop_all_reports},
-                                                {&enable_all_reports},
-                                                {&reset_data},
-                                                {&reset_board},
-                                                {&init_neo_pixels},
-                                                {&show_neo_pixels},
-                                                {&set_neo_pixel},
-                                                {&clear_all_neo_pixels},
-                                                {&fill_neo_pixels},
-                                                {&init_spi},
-                                                {&write_blocking_spi},
-                                                {&read_blocking_spi},
-                                                {&set_format_spi},
-                                                {&spi_cs_control},
-                                                {&set_scan_delay},
-                                                {&encoder_new},
-                                                {&sensor_new},
-                                                {&ping},
-                                                {&module_new},
-                                                {&module_data},
-                                                {&get_id},
-                                                {&set_id},
-                                                {&reset_to_bootloader}};
+template <typename V, typename... T>
+constexpr auto array_of(T&&... t)
+    -> std::array < V, sizeof...(T) >
+{
+    return {{ std::forward<T>(t)... }};
+}
+
+constexpr auto command_table = array_of<command_descriptor>(&serial_loopback,
+                                                &set_pin_mode,
+                                                &digital_write,
+                                                &pwm_write,
+                                                &modify_reporting,
+                                                &get_firmware_version,
+                                                &get_pico_unique_id,
+                                                &servo_attach,
+                                                &servo_write,
+                                                &servo_detach,
+                                                &i2c_begin,
+                                                &i2c_read,
+                                                &i2c_write,
+                                                &sonar_new,
+                                                &dht_new,
+                                                &stop_all_reports,
+                                                &enable_all_reports,
+                                                &reset_data,
+                                                &reset_board,
+                                                &init_neo_pixels,
+                                                &show_neo_pixels,
+                                                &set_neo_pixel,
+                                                &clear_all_neo_pixels,
+                                                &fill_neo_pixels,
+                                                &init_spi,
+                                                &write_blocking_spi,
+                                                &read_blocking_spi,
+                                                &set_format_spi,
+                                                &spi_cs_control,
+                                                &set_scan_delay,
+                                                &encoder_new,
+                                                &sensor_new,
+                                                &ping,
+                                                &module_new,
+                                                &module_data,
+                                                &get_id,
+                                                &set_id,
+                                                &feature_detect,
+                                                &reset_to_bootloader
+);
 
 /***************************************************************************
  *                   DEBUGGING FUNCTIONS
@@ -1539,6 +1548,41 @@ void set_id() {
   serial_write(id_msg, 3);
 }
 
+void feature_detect() {
+  // msg format: 2, FEATURE_DETECT, feature_id
+  uint8_t feature_id = command_buffer[1];
+  std::vector<uint8_t> id_msg = {4, FEATURE_CHECK, feature_id, 0};
+  if(feature_id >= command_table.size()) {
+    id_msg[3] = 0;
+    // id_msg[0]=2;
+    serial_write(id_msg);
+    return;
+  }
+  if(command_table[feature_id].command_func == nullptr) {
+    // id_msg[0] = 2;
+    id_msg[3] = 0;
+  } else {
+    // id_msg[0] = 2;
+    id_msg[3] = 1;
+  }
+  // TODO: add more features for specific types:
+  switch(feature_id) {
+    case SONAR_NEW:
+      id_msg.push_back(MAX_SONARS);
+      break;
+    case ENCODER_NEW:
+      id_msg.push_back(MAX_ENCODERS);
+      id_msg.push_back(1); // allow quad enc
+      break;
+    default:
+      break;
+  }
+  serial_write(id_msg);
+}
+
+
+
+
 volatile bool uart_enabled = true;
 
 void check_uart_loopback() {
@@ -1707,5 +1751,5 @@ static_assert(sizeof(command_buffer) == 30,
               "Command buffer size is not 30 bytes");
 static_assert(command_table[3].command_func == &pwm_write,
               "Command table is not correct");
-static_assert(command_table[37].command_func == &reset_to_bootloader,
+static_assert(command_table[38].command_func == &reset_to_bootloader,
               "Command table is not correct");
