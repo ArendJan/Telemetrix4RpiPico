@@ -34,6 +34,7 @@ add_executable(
   src/sensors/gps_sensor.cpp
   src/sensors/hmc5883l_sensor.cpp
   src/sensors/hx711_sensor.cpp
+  src/sensors/as5600_sensor.cpp
   src/sensors/ina226_sensor.cpp
   src/sensors/mpu9250_sensor.cpp
   src/sensors/sensor.cpp

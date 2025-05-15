@@ -39,7 +39,7 @@
 #include "sensors/mpu9250_sensor.hpp"
 #include "sensors/veml6040_sensor.hpp"
 #include "sensors/vl53l0x_sensor.hpp"
-
+#include "sensors/as5600_sensor.hpp"
 #include "drivers/neopixel.hpp"
 
 #include "Telemetrix4RpiPico.hpp"
@@ -759,11 +759,11 @@ int encoder_report_message[] = {3, ENCODER_REPORT, 0, 0};
 int c = 0;
 void scan_encoders() {
   if (encoders.next_encoder_index < 1) {
-    send_debug_info(1, 1);
+    // send_debug_info(1, 1);
     return;
   }
   if (!mutex_try_enter(&encoders.mutex, NULL)) {
-    send_debug_info(1, 0);
+    // send_debug_info(1, 0);
     return;
   }
   if (c % 100 == 0) {
@@ -1262,6 +1262,10 @@ void sensor_new() {
     sensor = new INA226_Sensor(sensor_data);
   } else if (type == SENSOR_TYPES::HMC5883l) {
     sensor = new HMC5883L_Sensor(sensor_data);
+  } else if (type == SENSOR_TYPES::AS5600_t) {
+    sensor = new AS5600_Sensor(sensor_data);
+  } else {
+    return;
   }
 
   sensor->type = type;

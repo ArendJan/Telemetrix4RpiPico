@@ -12,7 +12,7 @@
 // #include "Wire.h"
 #include <stdint.h>
 #include <math.h>
-const float PI = 3.1415926;
+// const float PI = 3.1415926;
 
 #define AS5600_LIB_VERSION              (F("0.6.5"))
 
@@ -30,7 +30,7 @@ const uint8_t AS5600_COUNTERCLOCK_WISE  = 1;  //  HIGH
 const float   AS5600_RAW_TO_DEGREES     = 360.0 / 4096;
 const float   AS5600_DEGREES_TO_RAW     = 4096 / 360.0;
 //  0.00153398078788564122971808758949;
-const float   AS5600_RAW_TO_RADIANS     = PI * 2.0 / 4096;
+const float   AS5600_RAW_TO_RADIANS     = 3.1415926 * 2.0 / 4096;
 //  4.06901041666666e-6
 const float   AS5600_RAW_TO_RPM         = 60.0 / 4096;
 
