@@ -11,12 +11,15 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS)
 endif()
 
 project(Telemetrix4RpiPico)
-pico_sdk_init()
+pico_sdk_init() 
 add_executable(
   Telemetrix4RpiPico
   src/Telemetrix4RpiPico.cpp
   src/i2c_helpers.cpp
   src/uart.cpp
+  # src/serialization.cpp
+  src/drivers/TCA9548.cpp
+  src/drivers/AS5600.cpp
   src/drivers/HMC5883L.cpp
   src/drivers/HX711.cpp
   src/drivers/HiwonderServo.cpp
