@@ -8,7 +8,6 @@
 
 #include "module/module.hpp"
 #include "sensors/sensor.hpp"
-
 #include "hardware/adc.h"
 #include "hardware/clocks.h"
 #include "hardware/i2c.h"

@@ -1246,11 +1246,7 @@ void sensor_new() {
     return;
   }
   Sensor *sensor = nullptr;
-  if (type == GPS) {
-    sensor = new GPS_Sensor(sensor_data);
-  } else if (type == SENSOR_TYPES::ADXL345) {
-    sensor = new ADXL345_Sensor(sensor_data);
-  } else if (type == SENSOR_TYPES::VEML6040) {
+  if (type == SENSOR_TYPES::VEML6040) {
     sensor = new VEML6040_Sensor(sensor_data);
   } else if (type == SENSOR_TYPES::TOF_VL53) {
     sensor = new VL53L0X_Sensor(sensor_data);
@@ -1609,13 +1605,12 @@ int main() {
 
   stdio_init_all();
   stdio_set_translate_crlf(&stdio_usb, false);
-#ifdef WITH_UART_STDIO
-  // Mirte-master pcb has uart rx connected to tx, resulting in loopback errors
+  // #ifdef WITH_UART_STDIO
   stdio_set_translate_crlf(&stdio_uart, false);
-#endif
+  // #endif
   stdio_flush();
-  check_uart_loopback(); // Mirte-master has pin 0 and 1 tied together, then
-                         // don't want to use it
+  // check_uart_loopback(); // Mirte-master has pin 0 and 1 tied together, then
+  //                        // don't want to use it
   adc_init();
   // create an array of pin_descriptors for 100 pins
   // establish the digital pin array
