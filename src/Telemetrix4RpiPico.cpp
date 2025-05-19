@@ -31,7 +31,9 @@
 #include "module/PCA9685_Module.hpp"
 #include "module/tmx_ssd1306_Module.hpp"
 
+#include "drivers/neopixel.hpp"
 #include "sensors/adxl345_sensor.hpp"
+#include "sensors/as5600_sensor.hpp"
 #include "sensors/gps_sensor.hpp"
 #include "sensors/hmc5883l_sensor.hpp"
 #include "sensors/hx711_sensor.hpp"
@@ -39,8 +41,6 @@
 #include "sensors/mpu9250_sensor.hpp"
 #include "sensors/veml6040_sensor.hpp"
 #include "sensors/vl53l0x_sensor.hpp"
-#include "sensors/as5600_sensor.hpp"
-#include "drivers/neopixel.hpp"
 
 #include "Telemetrix4RpiPico.hpp"
 /*******************************************************************

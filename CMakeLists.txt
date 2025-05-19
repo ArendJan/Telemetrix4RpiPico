@@ -11,7 +11,7 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS)
 endif()
 
 project(Telemetrix4RpiPico)
-pico_sdk_init() 
+pico_sdk_init()
 add_executable(
   Telemetrix4RpiPico
   src/Telemetrix4RpiPico.cpp
