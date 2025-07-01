@@ -288,3 +288,11 @@ time in ms.
 ```py
 [ 2, 0, enabled]
 ```
+
+
+
+## TODO:
+- analog pin reading numbering change to pin number instead of adc pin
+- feature detection (analog, servos, ...)
+- documentation
+- think about i2c with also other mcus

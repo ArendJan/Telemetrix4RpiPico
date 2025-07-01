@@ -687,12 +687,9 @@ void init_single_encoder(int A, encoder_t *enc) {
   enc->type = SINGLE;
 }
 
-// TODO: Figure out and rename: Magic x something todo with encoders;
-int x = 0;
 
 bool encoder_callback(repeating_timer_t *timer) {
   (void)timer;
-  x++;
   if (!mutex_try_enter(&encoders.mutex, NULL)) {
     return true;
   }
@@ -719,9 +716,12 @@ bool encoder_callback(repeating_timer_t *timer) {
       enc->last_state = new_bin_step;
     } else {
       bool a = gpio_get(enc->A);
-      if (a != enc->last_state) {
-        enc->step++;
-        enc->last_state = a;
+      if(a != enc->last_state) {
+        if (time_us_32() - enc->last_time > 1000) { // debounce time 1ms
+          enc->step++;
+          enc->last_time = time_us_32();
+          enc->last_state = a;
+        }
       }
     }
   }
@@ -776,22 +776,13 @@ void encoder_new() {
 }
 
 int encoder_report_message[] = {3, ENCODER_REPORT, 0, 0};
-int c = 0;
+
 void scan_encoders() {
   if (encoders.next_encoder_index < 1) {
     return;
   }
   if (!mutex_try_enter(&encoders.mutex, NULL)) {
     return;
-  }
-  if (c % 100 == 0) {
-    // send_debug_info(2, x);
-    c = 0;
-
-    if (x == 0) {
-      // create_encoder_timer();
-    }
-    x = 0;
   }
   for (int i = 0; i < encoders.next_encoder_index; i++) {
     encoder_t *enc = &encoders.encoders[i];
@@ -1141,7 +1132,7 @@ void scan_analog_inputs() {
   int differential;
 
   for (uint8_t i = 0; i < MAX_ANALOG_PINS_SUPPORTED; i++) {
-    if (the_analog_pins[i].reporting_enabled) {
+    if (the_analog_pins[i].reporting_enabled) { // TODO: move numbering to pin number for reporting
       adc_select_input(i);
       value = adc_read();
       differential = abs(value - the_analog_pins[i].last_value);
@@ -1356,13 +1347,11 @@ void module_new() {
     bool found = false;
     const uint8_t module_type_target = command_buffer[2];
     for(const auto& [module_type, func] : module_funcs) {
-      send_debug_info(10, module_type);
       if (module_type == module_type_target && func != nullptr) {
         found = true;
         break;
       }
     }
-    send_debug_info(10, found);
     serial_write({
       0, // packet length
       MODULE_REPORT,
@@ -1594,8 +1583,6 @@ void feature_detect() {
     serial_write(id_msg);
     return;
   }
-  send_debug_info(41, feature_id);
-  send_debug_info(40, command_table[feature_id].command_func == nullptr);
   if(command_table[feature_id].command_func == nullptr) {
     
     id_msg[3] = 0;
@@ -1609,7 +1596,14 @@ void feature_detect() {
       break;
     case ENCODER_NEW:
       id_msg.push_back(MAX_ENCODERS);
-      id_msg.push_back(1); // allow quad enc
+      id_msg.push_back(2); // allow quad enc
+      break;
+    case SET_PIN_MODE:
+      id_msg.push_back(MAX_DIGITAL_PINS_SUPPORTED);
+      id_msg.push_back(MAX_ANALOG_PINS_SUPPORTED);
+      for(int i = 0; i < MAX_ANALOG_PINS_SUPPORTED; i++) {
+        id_msg.push_back(the_analog_pins[i]);
+      }
       break;
     default:
       break;
@@ -1761,7 +1755,6 @@ int main() {
     if (!stop_reports) {
       if (time_us_32() - last_scan >= (scan_delay)) {
         last_scan += scan_delay;
-        // send_debug_info(10, (time_us_32() - last_scan) / 1000);
         scan_digital_inputs();
         scan_analog_inputs();
         scan_sonars();
