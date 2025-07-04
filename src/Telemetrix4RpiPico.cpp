@@ -48,6 +48,8 @@
  *              GLOBAL VARIABLES, AND STORAGE
  ******************************************************************/
 
+const auto ANALOG_OFFSET = 26;
+
 const uint LED_PIN = 25; // board LED
 
 // buffer to hold incoming command data
@@ -310,7 +312,6 @@ void set_pin_mode() {
                    divider);      // pwm clock should now be running at 1MHz
     top = 1'000'000UL / f_hz - 1; // calculate the TOP value
     pwm_set_wrap(slice_num, (uint16_t)top);
-
     // set the current level to 0
     pwm_set_gpio_level(pin, 0);
 
@@ -318,17 +319,20 @@ void set_pin_mode() {
     gpio_set_function(pin, GPIO_FUNC_PWM);
     break;
   }
-  case PIN_MODES::ANALOG_INPUT:
+  case PIN_MODES::ANALOG_INPUT: {
+    auto analog_pin = pin - ANALOG_OFFSET; // convert pin number to analog pin
     // if the temp sensor was selected, then turn it on
-    if (pin == ADC_TEMPERATURE_REGISTER) {
+    if (analog_pin == ADC_TEMPERATURE_REGISTER) {
       adc_set_temp_sensor_enabled(true);
     }
-    the_analog_pins[pin].reporting_enabled =
+    the_analog_pins[analog_pin].reporting_enabled =
         command_buffer[SET_PIN_MODE_ANALOG_IN_REPORTING_STATE];
     // save the differential value
-    the_analog_pins[pin].differential = decode_u16(
+    the_analog_pins[analog_pin].differential = decode_u16(
         std::span(command_buffer)
             .subspan<SET_PIN_MODE_ANALOG_DIFF_HIGH, sizeof(uint16_t)>());
+    
+          }
     break;
   default:
     break;
@@ -377,19 +381,19 @@ void modify_reporting() {
     }
     break;
   case REPORTING_ANALOG_ENABLE:
-    the_analog_pins[pin].reporting_enabled = true;
+    the_analog_pins[pin - ANALOG_OFFSET].reporting_enabled = true;
     break;
   case REPORTING_ANALOG_DISABLE:
-    the_analog_pins[pin].reporting_enabled = false;
+    the_analog_pins[pin - ANALOG_OFFSET].reporting_enabled = false;
     break;
   case REPORTING_DIGITAL_ENABLE:
-    if (the_digital_pins[pin].pin_mode != PIN_MODE_NOT_SET) {
-      the_digital_pins[pin].reporting_enabled = true;
+    if (the_digital_pins[pin - ANALOG_OFFSET].pin_mode != PIN_MODE_NOT_SET) {
+      the_digital_pins[pin - ANALOG_OFFSET].reporting_enabled = true;
     }
     break;
   case REPORTING_DIGITAL_DISABLE:
-    if (the_digital_pins[pin].pin_mode != PIN_MODE_NOT_SET) {
-      the_digital_pins[pin].reporting_enabled = false;
+    if (the_digital_pins[pin - ANALOG_OFFSET].pin_mode != PIN_MODE_NOT_SET) {
+      the_digital_pins[pin - ANALOG_OFFSET].reporting_enabled = false;
     }
     break;
   default:
@@ -454,6 +458,20 @@ void i2c_begin() {
   // get the GPIO pins associated with this i2c instance
   uint sda_gpio = command_buffer[I2C_SDA_GPIO_PIN];
   uint scl_gpio = command_buffer[I2C_SCL_GPIO_PIN];
+  uint8_t i2c_port = command_buffer[I2C_PORT];
+  if(i2c_port == sda_gpio && i2c_port == scl_gpio) {
+    // if the port is the same as the GPIO pins, then we are targeted as a raw device, so just use the default i2c pins
+    if(i2c_port == 0) {
+      sda_gpio = 4;
+      scl_gpio = 5;
+    } else if(i2c_port == 1) {
+      sda_gpio = 10;
+      scl_gpio = 11;
+    } else {
+      // invalid port, so return
+      return;
+    }
+  }
   reset_i2c(scl_gpio, sda_gpio, command_buffer[I2C_PORT]);
   // // set the i2c instance - 0 or 1
   // if (command_buffer[I2C_PORT] == 0) {
@@ -1140,7 +1158,7 @@ void scan_analog_inputs() {
         auto msg_span = std::span(analog_input_report_message);
         // trigger value achieved, send out the report
         the_analog_pins[i].last_value = value;
-        analog_input_report_message[ANALOG_INPUT_GPIO_PIN] = (uint8_t)i;
+        analog_input_report_message[ANALOG_INPUT_GPIO_PIN] = (uint8_t)i + ANALOG_OFFSET;
         std::copy_n(encode_u16(value).cbegin(), sizeof(uint16_t),
                     msg_span.subspan<ANALOG_VALUE_HIGH_BYTE, sizeof(uint16_t)>()
                         .begin());
@@ -1357,7 +1375,7 @@ void module_new() {
       MODULE_REPORT,
       0, // feature check
       module_type_target,
-      found ? 1 : 0
+      (uint8_t)(found ? 1u : 0u)
   });
   }
 }
@@ -1600,10 +1618,24 @@ void feature_detect() {
       break;
     case SET_PIN_MODE:
       id_msg.push_back(MAX_DIGITAL_PINS_SUPPORTED);
+      id_msg.push_back(12); // adc resolution is 12 bit
+      id_msg.push_back(14); // pwm resolution is 14 bit kinda
       id_msg.push_back(MAX_ANALOG_PINS_SUPPORTED);
       for(int i = 0; i < MAX_ANALOG_PINS_SUPPORTED; i++) {
-        id_msg.push_back(the_analog_pins[i]);
+        id_msg.push_back(i+ANALOG_OFFSET);
       }
+      break;
+    case SERVO_ATTACH:
+      id_msg.push_back(12);
+      break;
+    case GET_FIRMWARE_VERSION:
+      id_msg.push_back(FIRMWARE_MAJOR);
+      id_msg.push_back(FIRMWARE_MINOR);
+      break;
+    case GET_PICO_UNIQUE_ID:
+      break;
+    case I2C_BEGIN:
+      id_msg.push_back(2); // 2 i2c ports
       break;
     default:
       break;
