@@ -31,7 +31,9 @@
 #include "module/PCA9685_Module.hpp"
 #include "module/tmx_ssd1306_Module.hpp"
 
+#include "drivers/neopixel.hpp"
 #include "sensors/adxl345_sensor.hpp"
+#include "sensors/as5600_sensor.hpp"
 #include "sensors/gps_sensor.hpp"
 #include "sensors/hmc5883l_sensor.hpp"
 #include "sensors/hx711_sensor.hpp"
@@ -39,8 +41,6 @@
 #include "sensors/mpu9250_sensor.hpp"
 #include "sensors/veml6040_sensor.hpp"
 #include "sensors/vl53l0x_sensor.hpp"
-
-#include "drivers/neopixel.hpp"
 
 #include "Telemetrix4RpiPico.hpp"
 #include "serialization.hpp"
@@ -1281,11 +1281,7 @@ void sensor_new() {
     return;
   }
   Sensor *sensor = nullptr;
-  if (type == GPS) {
-    sensor = new GPS_Sensor(sensor_data);
-  } else if (type == SENSOR_TYPES::ADXL345) {
-    sensor = new ADXL345_Sensor(sensor_data);
-  } else if (type == SENSOR_TYPES::VEML6040) {
+  if (type == SENSOR_TYPES::VEML6040) {
     sensor = new VEML6040_Sensor(sensor_data);
   } else if (type == SENSOR_TYPES::TOF_VL53) {
     sensor = new VL53L0X_Sensor(sensor_data);
@@ -1297,6 +1293,10 @@ void sensor_new() {
     sensor = new INA226_Sensor(sensor_data);
   } else if (type == SENSOR_TYPES::HMC5883l) {
     sensor = new HMC5883L_Sensor(sensor_data);
+  } else if (type == SENSOR_TYPES::AS5600_t) {
+    sensor = new AS5600_Sensor(sensor_data);
+  } else {
+    return;
   }
 
   sensor->type = type;
@@ -1740,13 +1740,12 @@ int main() {
 
   stdio_init_all();
   stdio_set_translate_crlf(&stdio_usb, false);
-#ifdef WITH_UART_STDIO
-  // Mirte-master pcb has uart rx connected to tx, resulting in loopback errors
+  // #ifdef WITH_UART_STDIO
   stdio_set_translate_crlf(&stdio_uart, false);
-#endif
+  // #endif
   stdio_flush();
-  check_uart_loopback(); // Mirte-master has pin 0 and 1 tied together, then
-                         // don't want to use it
+  // check_uart_loopback(); // Mirte-master has pin 0 and 1 tied together, then
+  //                        // don't want to use it
   adc_init();
   // create an array of pin_descriptors for 100 pins
   // establish the digital pin array

@@ -163,3 +163,15 @@ out_without_reinit:
 
   return ret;
 }
+
+bool check_addr(int i2c_port, int addr) {
+  i2c_inst_t *i2c;
+
+  if (i2c_port) {
+    i2c = i2c1;
+  } else {
+    i2c = i2c0;
+  }
+  int ret = i2c_write_timeout_us(i2c, addr, nullptr, 0, false, 10);
+  return ret == PICO_ERROR_GENERIC;
+}

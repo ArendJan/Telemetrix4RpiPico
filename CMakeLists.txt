@@ -22,6 +22,8 @@ add_executable(
   src/i2c_helpers.cpp
   src/uart.cpp
   src/serialization.cpp
+  src/drivers/TCA9548.cpp
+  src/drivers/AS5600.cpp
   src/drivers/HMC5883L.cpp
   src/drivers/HX711.cpp
   src/drivers/HiwonderServo.cpp
@@ -36,6 +38,7 @@ add_executable(
   src/sensors/gps_sensor.cpp
   src/sensors/hmc5883l_sensor.cpp
   src/sensors/hx711_sensor.cpp
+  src/sensors/as5600_sensor.cpp
   src/sensors/ina226_sensor.cpp
   src/sensors/mpu9250_sensor.cpp
   src/sensors/sensor.cpp
@@ -58,7 +61,8 @@ target_include_directories(Telemetrix4RpiPico
 pico_generate_pio_header(Telemetrix4RpiPico
                          ${CMAKE_CURRENT_LIST_DIR}/src/Telemetrix4RpiPico.pio)
 pico_enable_stdio_usb(Telemetrix4RpiPico 1)
-pico_enable_stdio_uart(Telemetrix4RpiPico 0)
+pico_enable_stdio_uart(Telemetrix4RpiPico 1) # TODO: For master version this
+                                             # must be disabled
 pico_add_extra_outputs(Telemetrix4RpiPico)
 add_subdirectory(pico-ssd1306)
 
