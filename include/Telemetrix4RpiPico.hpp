@@ -174,7 +174,8 @@ typedef struct {
   int B;
   int8_t step;
   int last_state;
-  decltype(time_us_32()) last_time; // last time the single encoder was increased to prevent bouncing
+  decltype(time_us_32()) last_time; // last time the single encoder was
+                                    // increased to prevent bouncing
 } encoder_t;
 
 typedef struct {

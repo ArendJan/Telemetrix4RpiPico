@@ -163,52 +163,20 @@ int dht_report_message[] = {
  ****************************************************************/
 // An array of pointers to the command functions
 template <typename V, typename... T>
-constexpr auto array_of(T&&... t)
-    -> std::array < V, sizeof...(T) >
-{
-    return {{ std::forward<T>(t)... }};
+constexpr auto array_of(T &&...t) -> std::array<V, sizeof...(T)> {
+  return {{std::forward<T>(t)...}};
 }
 
-constexpr auto command_table = array_of<command_descriptor>(&serial_loopback,
-                                                &set_pin_mode,
-                                                &digital_write,
-                                                &pwm_write,
-                                                &modify_reporting,
-                                                &get_firmware_version,
-                                                &get_pico_unique_id,
-                                                &servo_attach,
-                                                &servo_write,
-                                                &servo_detach,
-                                                &i2c_begin,
-                                                &i2c_read,
-                                                &i2c_write,
-                                                &sonar_new,
-                                                &dht_new,
-                                                &stop_all_reports,
-                                                &enable_all_reports,
-                                                &reset_data,
-                                                &reset_board,
-                                                &init_neo_pixels,
-                                                &show_neo_pixels,
-                                                &set_neo_pixel,
-                                                &clear_all_neo_pixels,
-                                                &fill_neo_pixels,
-                                                &init_spi,
-                                                &write_blocking_spi,
-                                                &read_blocking_spi,
-                                                &set_format_spi,
-                                                &spi_cs_control,
-                                                &set_scan_delay,
-                                                &encoder_new,
-                                                &sensor_new,
-                                                &ping,
-                                                &module_new,
-                                                &module_data,
-                                                &get_id,
-                                                &set_id,
-                                                &feature_detect,
-                                                &reset_to_bootloader
-);
+constexpr auto command_table = array_of<command_descriptor>(
+    &serial_loopback, &set_pin_mode, &digital_write, &pwm_write,
+    &modify_reporting, &get_firmware_version, &get_pico_unique_id,
+    &servo_attach, &servo_write, &servo_detach, &i2c_begin, &i2c_read,
+    &i2c_write, &sonar_new, &dht_new, &stop_all_reports, &enable_all_reports,
+    &reset_data, &reset_board, &init_neo_pixels, &show_neo_pixels,
+    &set_neo_pixel, &clear_all_neo_pixels, &fill_neo_pixels, &init_spi,
+    &write_blocking_spi, &read_blocking_spi, &set_format_spi, &spi_cs_control,
+    &set_scan_delay, &encoder_new, &sensor_new, &ping, &module_new,
+    &module_data, &get_id, &set_id, &feature_detect, &reset_to_bootloader);
 
 /***************************************************************************
  *                   DEBUGGING FUNCTIONS
@@ -331,9 +299,8 @@ void set_pin_mode() {
     the_analog_pins[analog_pin].differential = decode_u16(
         std::span(command_buffer)
             .subspan<SET_PIN_MODE_ANALOG_DIFF_HIGH, sizeof(uint16_t)>());
-    
-          }
-    break;
+
+  } break;
   default:
     break;
   }
@@ -459,12 +426,13 @@ void i2c_begin() {
   uint sda_gpio = command_buffer[I2C_SDA_GPIO_PIN];
   uint scl_gpio = command_buffer[I2C_SCL_GPIO_PIN];
   uint8_t i2c_port = command_buffer[I2C_PORT];
-  if(i2c_port == sda_gpio && i2c_port == scl_gpio) {
-    // if the port is the same as the GPIO pins, then we are targeted as a raw device, so just use the default i2c pins
-    if(i2c_port == 0) {
+  if (i2c_port == sda_gpio && i2c_port == scl_gpio) {
+    // if the port is the same as the GPIO pins, then we are targeted as a raw
+    // device, so just use the default i2c pins
+    if (i2c_port == 0) {
       sda_gpio = 4;
       scl_gpio = 5;
-    } else if(i2c_port == 1) {
+    } else if (i2c_port == 1) {
       sda_gpio = 10;
       scl_gpio = 11;
     } else {
@@ -705,7 +673,6 @@ void init_single_encoder(int A, encoder_t *enc) {
   enc->type = SINGLE;
 }
 
-
 bool encoder_callback(repeating_timer_t *timer) {
   (void)timer;
   if (!mutex_try_enter(&encoders.mutex, NULL)) {
@@ -734,7 +701,7 @@ bool encoder_callback(repeating_timer_t *timer) {
       enc->last_state = new_bin_step;
     } else {
       bool a = gpio_get(enc->A);
-      if(a != enc->last_state) {
+      if (a != enc->last_state) {
         if (time_us_32() - enc->last_time > 1000) { // debounce time 1ms
           enc->step++;
           enc->last_time = time_us_32();
@@ -1150,7 +1117,8 @@ void scan_analog_inputs() {
   int differential;
 
   for (uint8_t i = 0; i < MAX_ANALOG_PINS_SUPPORTED; i++) {
-    if (the_analog_pins[i].reporting_enabled) { // TODO: move numbering to pin number for reporting
+    if (the_analog_pins[i].reporting_enabled) { // TODO: move numbering to pin
+                                                // number for reporting
       adc_select_input(i);
       value = adc_read();
       differential = abs(value - the_analog_pins[i].last_value);
@@ -1158,7 +1126,8 @@ void scan_analog_inputs() {
         auto msg_span = std::span(analog_input_report_message);
         // trigger value achieved, send out the report
         the_analog_pins[i].last_value = value;
-        analog_input_report_message[ANALOG_INPUT_GPIO_PIN] = (uint8_t)i + ANALOG_OFFSET;
+        analog_input_report_message[ANALOG_INPUT_GPIO_PIN] =
+            (uint8_t)i + ANALOG_OFFSET;
         std::copy_n(encode_u16(value).cbegin(), sizeof(uint16_t),
                     msg_span.subspan<ANALOG_VALUE_HIGH_BYTE, sizeof(uint16_t)>()
                         .begin());
@@ -1271,38 +1240,82 @@ void reset_hardware() {
 }
 // SENSORSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
 
+auto sensor_funcs = std::vector<std::pair<
+    SENSOR_TYPES, std::function<Sensor *(uint8_t[SENSORS_MAX_SETTINGS_A])>>>{
+    {SENSOR_TYPES::VEML6040,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new VEML6040_Sensor(data);
+     }},
+    {SENSOR_TYPES::TOF_VL53,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new VL53L0X_Sensor(data);
+     }},
+    {SENSOR_TYPES::MPU_9250,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new MPU9250_Sensor(data);
+     }},
+    {SENSOR_TYPES::LOAD_CELL,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new HX711_Sensor(data);
+     }},
+    {SENSOR_TYPES::INA226a,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new INA226_Sensor(data);
+     }},
+    {SENSOR_TYPES::HMC5883l,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new HMC5883L_Sensor(data);
+     }},
+    {SENSOR_TYPES::AS5600_t,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new AS5600_Sensor(data);
+     }},
+};
+
 void sensor_new() {
-  const SENSOR_TYPES type = (SENSOR_TYPES)command_buffer[2];
-  const uint8_t sensor_num = command_buffer[1];
-  uint8_t sensor_data[SENSORS_MAX_SETTINGS_A];
-  std::copy(command_buffer + 3, command_buffer + 3 + SENSORS_MAX_SETTINGS_A,
-            sensor_data);
-  if (type >= SENSOR_TYPES::MAX_SENSORS) {
-    return;
-  }
-  Sensor *sensor = nullptr;
-  if (type == SENSOR_TYPES::VEML6040) {
-    sensor = new VEML6040_Sensor(sensor_data);
-  } else if (type == SENSOR_TYPES::TOF_VL53) {
-    sensor = new VL53L0X_Sensor(sensor_data);
-  } else if (type == SENSOR_TYPES::MPU_9250) {
-    sensor = new MPU9250_Sensor(sensor_data);
-  } else if (type == SENSOR_TYPES::LOAD_CELL) {
-    sensor = new HX711_Sensor(sensor_data);
-  } else if (type == SENSOR_TYPES::INA226a) {
-    sensor = new INA226_Sensor(sensor_data);
-  } else if (type == SENSOR_TYPES::HMC5883l) {
-    sensor = new HMC5883L_Sensor(sensor_data);
-  } else if (type == SENSOR_TYPES::AS5600_t) {
-    sensor = new AS5600_Sensor(sensor_data);
-  } else {
-    return;
-  }
 
-  sensor->type = type;
-  sensor->num = sensor_num;
+  const uint8_t sensor_cmd = command_buffer[1];
+  if (sensor_cmd == 0) { // feature detection
+    const SENSOR_TYPES type = (SENSOR_TYPES)command_buffer[2];
+    bool found = false;
+    for (const auto &sensor_f : sensor_funcs) {
+      if (sensor_f.first == type) {
+        found = true;
+        break;
+      }
+    }
+    serial_write({0, // packet length
+                  SENSOR_MAIN_REPORT,
+                  0, // feature check
+                  (uint8_t)type, (uint8_t)(found ? 1u : 0u)});
 
-  sensors.push_back(sensor);
+  } else if (sensor_cmd == 1) {
+
+    const SENSOR_TYPES type = (SENSOR_TYPES)command_buffer[3];
+    const uint8_t sensor_num = command_buffer[2];
+
+    uint8_t sensor_data[SENSORS_MAX_SETTINGS_A];
+    std::copy(command_buffer + 4, command_buffer + 4 + SENSORS_MAX_SETTINGS_A,
+              sensor_data);
+    if (type >= SENSOR_TYPES::MAX_SENSORS) {
+      return;
+    }
+    Sensor *sensor = nullptr;
+    for (auto sensor_f : sensor_funcs) {
+      if (sensor_f.first == type) {
+        sensor = sensor_f.second(sensor_data);
+        break;
+      }
+    }
+    if (sensor == nullptr) {
+      return; // sensor not found
+    }
+
+    sensor->type = type;
+    sensor->num = sensor_num;
+
+    sensors.push_back(sensor);
+  }
 }
 
 void readSensors() {
@@ -1318,15 +1331,20 @@ void readSensors() {
 /***************MODULES*************************/
 void module_new() {
   const auto msg_type = command_buffer[1];
-  const std::vector<std::pair<MODULE_TYPES, std::function<Module *( std::vector<uint8_t>&)>>> module_funcs =
-      {
-          {MODULE_TYPES::PCA9685, [](std::vector<uint8_t>& data) { return new PCA9685_Module(data); }},
-          {MODULE_TYPES::HIWONDER_SERVO, []( std::vector<uint8_t>& data) { return new Hiwonder_Servo(data); }},
-          // {MODULE_TYPES::SHUTDOWN_RELAY, [](const std::vector<uint8_t>& data) { return nullptr; /* not implemented */ }},
-          {MODULE_TYPES::TMX_SSD1306, []( std::vector<uint8_t>& data) { return new TmxSSD1306(data); }},
+  const std::vector<
+      std::pair<MODULE_TYPES, std::function<Module *(std::vector<uint8_t> &)>>>
+      module_funcs = {
+          {MODULE_TYPES::PCA9685,
+           [](std::vector<uint8_t> &data) { return new PCA9685_Module(data); }},
+          {MODULE_TYPES::HIWONDER_SERVO,
+           [](std::vector<uint8_t> &data) { return new Hiwonder_Servo(data); }},
+          // {MODULE_TYPES::SHUTDOWN_RELAY, [](const std::vector<uint8_t>& data)
+          // { return nullptr; /* not implemented */ }},
+          {MODULE_TYPES::TMX_SSD1306,
+           [](std::vector<uint8_t> &data) { return new TmxSSD1306(data); }},
       };
 
-  if(msg_type==1) {
+  if (msg_type == 1) {
     const MODULE_TYPES type = (MODULE_TYPES)command_buffer[3];
     const uint8_t module_num = command_buffer[2];
     std::vector<uint8_t> data;
@@ -1348,7 +1366,7 @@ void module_new() {
     // } else {
     //   return;
     // }
-    for (const auto& [module_type, func] : module_funcs) {
+    for (const auto &[module_type, func] : module_funcs) {
       if (module_type == type) {
         module = func(data);
         break;
@@ -1361,22 +1379,19 @@ void module_new() {
     module->num = module_num;
 
     modules.push_back(module);
-  } else if(msg_type==0) { // check module type feature detection
+  } else if (msg_type == 0) { // check module type feature detection
     bool found = false;
     const uint8_t module_type_target = command_buffer[2];
-    for(const auto& [module_type, func] : module_funcs) {
+    for (const auto &[module_type, func] : module_funcs) {
       if (module_type == module_type_target && func != nullptr) {
         found = true;
         break;
       }
     }
-    serial_write({
-      0, // packet length
-      MODULE_REPORT,
-      0, // feature check
-      module_type_target,
-      (uint8_t)(found ? 1u : 0u)
-  });
+    serial_write({0, // packet length
+                  MODULE_REPORT,
+                  0, // feature check
+                  module_type_target, (uint8_t)(found ? 1u : 0u)});
   }
 }
 
@@ -1595,56 +1610,53 @@ void feature_detect() {
   // msg format: 2, FEATURE_DETECT, feature_id
   uint8_t feature_id = command_buffer[1];
   std::vector<uint8_t> id_msg = {4, FEATURE_CHECK, feature_id, 0};
-  if(feature_id >= command_table.size()) {
+  if (feature_id >= command_table.size()) {
     id_msg[3] = 0;
     // id_msg[0]=2;
     serial_write(id_msg);
     return;
   }
-  if(command_table[feature_id].command_func == nullptr) {
-    
+  if (command_table[feature_id].command_func == nullptr) {
+
     id_msg[3] = 0;
   } else {
     id_msg[3] = 1;
   }
   // TODO: add more features for specific types:
-  switch(feature_id) {
-    case SONAR_NEW:
-      id_msg.push_back(MAX_SONARS);
-      break;
-    case ENCODER_NEW:
-      id_msg.push_back(MAX_ENCODERS);
-      id_msg.push_back(2); // allow quad enc
-      break;
-    case SET_PIN_MODE:
-      id_msg.push_back(MAX_DIGITAL_PINS_SUPPORTED);
-      id_msg.push_back(12); // adc resolution is 12 bit
-      id_msg.push_back(14); // pwm resolution is 14 bit kinda
-      id_msg.push_back(MAX_ANALOG_PINS_SUPPORTED);
-      for(int i = 0; i < MAX_ANALOG_PINS_SUPPORTED; i++) {
-        id_msg.push_back(i+ANALOG_OFFSET);
-      }
-      break;
-    case SERVO_ATTACH:
-      id_msg.push_back(12);
-      break;
-    case GET_FIRMWARE_VERSION:
-      id_msg.push_back(FIRMWARE_MAJOR);
-      id_msg.push_back(FIRMWARE_MINOR);
-      break;
-    case GET_PICO_UNIQUE_ID:
-      break;
-    case I2C_BEGIN:
-      id_msg.push_back(2); // 2 i2c ports
-      break;
-    default:
-      break;
+  switch (feature_id) {
+  case SONAR_NEW:
+    id_msg.push_back(MAX_SONARS);
+    break;
+  case ENCODER_NEW:
+    id_msg.push_back(MAX_ENCODERS);
+    id_msg.push_back(2); // allow quad enc
+    break;
+  case SET_PIN_MODE:
+    id_msg.push_back(MAX_DIGITAL_PINS_SUPPORTED);
+    id_msg.push_back(12); // adc resolution is 12 bit
+    id_msg.push_back(14); // pwm resolution is 14 bit kinda
+    id_msg.push_back(MAX_ANALOG_PINS_SUPPORTED);
+    for (int i = 0; i < MAX_ANALOG_PINS_SUPPORTED; i++) {
+      id_msg.push_back(i + ANALOG_OFFSET);
+    }
+    break;
+  case SERVO_ATTACH:
+    id_msg.push_back(12);
+    break;
+  case GET_FIRMWARE_VERSION:
+    id_msg.push_back(FIRMWARE_MAJOR);
+    id_msg.push_back(FIRMWARE_MINOR);
+    break;
+  case GET_PICO_UNIQUE_ID:
+    break;
+  case I2C_BEGIN:
+    id_msg.push_back(2); // 2 i2c ports
+    break;
+  default:
+    break;
   }
   serial_write(id_msg);
 }
-
-
-
 
 volatile bool uart_enabled = true;
 

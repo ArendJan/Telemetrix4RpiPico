@@ -13,7 +13,6 @@ AS5600_Sensor::AS5600_Sensor(uint8_t settings[SENSORS_MAX_SETTINGS_A]) {
   auto num = 0;
   while (mux > 0) {
     if (mux & 1) {
-      send_debug_info(50, num);
       this->as_sensors.push_back(std::make_pair(num, AS5600(i2c_port)));
     }
     mux = mux >> 1;
@@ -21,13 +20,11 @@ AS5600_Sensor::AS5600_Sensor(uint8_t settings[SENSORS_MAX_SETTINGS_A]) {
   }
   this->mux = new TCA9548(0x70, i2c_port);
   auto ok = this->mux->begin();
-  send_debug_info(51, ok);
   for (auto &as_sensor : this->as_sensors) {
     this->mux->selectChannel(as_sensor.first);
     ok |= as_sensor.second.begin();
   }
   this->mux->disableAllChannels();
-  send_debug_info(52, ok);
 }
 
 void AS5600_Sensor::readSensor() {

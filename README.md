@@ -88,13 +88,23 @@ Receive:
 [FEATURE_REQUEST_REPORT = 37, MSG_TYPE, OK, ...MSG_DATA]
 ```
 
+#### Feature detection data
+| Command | Reply | Notes |
+| ------- | ----- | ----- |
+| SONAR_NEW=13 | [MAX_SONARS] | Often limited by the interrupt pins or array size |
+| ENCODER_NEW=30 | [MAX_ENCODERS, TYPE_SUPPORT] | Max encoders supported, TYPE_SUPPORT: 1: only single pin counting up, 2: quadrature support, up&down counting |
+| SET_PIN_MODE=1 | [MAX_DIGITAL_PINS, ADC_RESOLUTION, PWM_RESOLUTION, MAX_ANALOG_PINS, ...ANALOG_PINS] | Resolution in bits, ANALOG_PINS is list(size is MAX_ANALOG_PINS) of pins used internally in board core, can be 0xff to signal it doesn't exist, can have holes in list |
+| SERVO_ATTACH=7 | [MAX_SERVOS] | |
+| GET_FIRMWARE_VERSION=5 | [MAJOR, MINOR] | |
+| I2C_BEGIN=10 | [TOTAL_I2C_PORTS] | When using the default port pins, use sda=scl=port |
+
 
 ### I2C
 
 #### I2C start
 To start an I2C bus, send this command once. Every start command will reset the bus, resetting/losing connection with previous I2C devices.
 The i2c_port must be 0 or 1 for the RP2040. port 0 sda pins: ```[0, 4, 8, 12, 20, 16]```, port 1 sda pins: ```[2, 6, 10, 14, 26, 18]```. There is no check on this on the MCU side. The speed will be set to 100k and pull-ups enabled.
-
+Use i2c_port=0, sda=0 & scl=0 for default pins of port 0, Use i2c_port=1, sda=1 & scl=1 for default port 1.
 
 Send:
 ```py
@@ -170,7 +180,7 @@ Receive:
 To read a digital/analog pin, you need to send a command to set the pin mode and then, on-change, the data will be sent. It's possible to switch modes during operation, even input <-> output. Just send a new ```SET_PIN_MODE``` message.
 
 #### Analog
-The pin must be in range of [0..5] (pico: 26+adc_pin == gpio_pin, 4==temp_sensor). differential is the minimal change for the value or it is not reported.
+The pin must be in range of all the possible pins. If it's not an analog pin, then you'll receive nothing or bogus data. differential is the minimal change for the value or it is not reported.
 
 Differential is ```uint16_t```, with ```diff_high = diff>>8``` and ```diff_low = diff&0xFF```. 
 
@@ -219,7 +229,7 @@ If you only want to en/disable a single pin or type, send this message.
 modify_type can be any of
 - REPORTING_DISABLE_ALL = 0. Disable analog and digital inputs reporting. Set pin to 0.
 - REPORTING_ANALOG_ENABLE = 1. Enable a single analog pin. Needs to have been set as analog pin otherwise UB.
-- REPORTING_ANALOG_DISABLE = 3. Disable a single analog pin. Pin in range ```[0..5]```
+- REPORTING_ANALOG_DISABLE = 3. Disable a single analog pin. Pin in range ```[0..max_pin]```
 - REPORTING_DIGITAL_ENABLE = 2. Enable a single digital pin. Needs to have been set as digital input, otherwise UB.
 - REPORTING_DIGITAL_DISABLE = 4. Disable a single digital pin.
 
@@ -263,7 +273,39 @@ The servo messages, types 7-9, are not supported (yet), as servos can be used wi
 
 ## Modules
 
-TODO: add module init & feature checking
+Module system allows multiple types of sensors/actuators that send and receive data. Not all types might be supported by a board implementation.
+
+### Check module availability
+Send this command to check that the board supports the module you want to use.
+
+```py
+[MODULE_NEW=33, CHECK=0, module_type]
+```
+
+Current modules:
+- PCA9685 = 0,                // 16x 12bit PWM
+- HIWONDER_SERVO = 1, 
+- SHUTDOWN_RELAY = 2, not really working
+- TMX_SSD1306 = 3, default oled
+
+### Adding modules:
+Send this command with any init information to the board. No reply by default from the system, only if the module implemented something.
+Module_num must be consecutive from 0.
+
+```py
+[MODULE_NEW=33, ADD=1, module_num, module_type, ...init_data]
+```
+
+### Sending data to module:
+Same module num as used when adding module.
+```py
+[MODULE_DATA=34, module_num, ...module_data]
+```
+### Data from module
+
+```py
+[MODULE_REPORT=33, module_num, module_type, ...module_data]
+```
 
 ### Hiwonder:
 Servos are identified based on an id. The actual servo id is only transmitted at init, after that the index of the servo in the init list is used to offload id searching from the pico to the computer.
@@ -295,4 +337,4 @@ time in ms.
 - analog pin reading numbering change to pin number instead of adc pin
 - feature detection (analog, servos, ...)
 - documentation
-- think about i2c with also other mcus
+- check docs with new arduino stuff, msg nums and pico specific stuff
