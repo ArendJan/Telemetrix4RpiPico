@@ -1,4 +1,5 @@
 #!/bin/bash
+# de8ae5a
 set -e
 git config --global --add safe.directory /__w/Telemetrix4RpiPico/Telemetrix4RpiPico # fix for cmake not reading git stuff
 mkdir build2/
@@ -15,3 +16,4 @@ cd ..
 # cmake -DCMAKE_BUILD_TYPE=Debug ..
 # make
 sha256sum * || true
+sha256sum build/* || true

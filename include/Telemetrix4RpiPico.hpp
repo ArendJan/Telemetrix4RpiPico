@@ -6,9 +6,6 @@
 #include "message_types.hpp"
 #include "uart.hpp"
 
-#include "module/module.hpp"
-#include "sensors/sensor.hpp"
-
 #include "hardware/adc.h"
 #include "hardware/clocks.h"
 #include "hardware/i2c.h"
@@ -18,8 +15,10 @@
 #include "hardware/watchdog.h"
 #include "i2c_helpers.hpp"
 #include "math.h"
+#include "module/module.hpp"
 #include "pico/stdlib.h"
 #include "pico/unique_id.h"
+#include "sensors/sensor.hpp"
 #include <array>
 #include <pico/sync.h>
 #include <stdio.h>
@@ -103,6 +102,8 @@ extern void set_format_spi();
 
 extern void set_scan_delay();
 
+void feature_detect();
+
 void encoder_new();
 
 void check_uart_loopback();
@@ -173,6 +174,8 @@ typedef struct {
   int B;
   int8_t step;
   int last_state;
+  decltype(time_us_32()) last_time; // last time the single encoder was
+                                    // increased to prevent bouncing
 } encoder_t;
 
 typedef struct {

@@ -194,7 +194,6 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
     // auto offset = servo->read_angle_offset();
     this->servos.push_back(servo);
     this->enabled_servos++;
-    send_debug_info(13, this->enabled_servos);
     servo->enable();
     std::vector<uint8_t> data = {
         ADD_SERVO,                          // add servo type

@@ -16,6 +16,7 @@ enum SENSOR_TYPES : uint8_t { // Max 255 sensors, but will always fit in a
   ADXL345 = 5,  // 3 axis accel
   INA226a = 6,
   HMC5883l = 7,
+  AS5600_t = 8,
   MAX_SENSORS
 };
 
