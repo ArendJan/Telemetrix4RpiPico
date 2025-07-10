@@ -1753,10 +1753,10 @@ int main() {
   stdio_init_all();
   stdio_set_translate_crlf(&stdio_usb, false);
   // #ifdef WITH_UART_STDIO
-  stdio_set_translate_crlf(&stdio_uart, false);
+  // stdio_set_translate_crlf(&stdio_uart, false);
   // #endif
   stdio_flush();
-  // check_uart_loopback(); // Mirte-master has pin 0 and 1 tied together, then
+  check_uart_loopback(); // Mirte-master has pin 0 and 1 tied together, then
   //                        // don't want to use it
   adc_init();
   // create an array of pin_descriptors for 100 pins
