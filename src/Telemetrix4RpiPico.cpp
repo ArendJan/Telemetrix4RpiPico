@@ -1389,7 +1389,7 @@ void module_new() {
       }
     }
     serial_write({0, // packet length
-                  MODULE_REPORT,
+                  MODULE_MAIN_REPORT,
                   0, // feature check
                   module_type_target, (uint8_t)(found ? 1u : 0u)});
   }
