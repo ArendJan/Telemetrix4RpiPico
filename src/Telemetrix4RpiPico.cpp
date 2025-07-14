@@ -1041,6 +1041,7 @@ void get_next_command() {
     // no data, let the main loop continue to run to handle inputs
     return;
   } else {
+    gpio_put(LED_PIN, !gpio_get(LED_PIN)); // toggle the led state
     // get the rest of the packet
     for (int i = 0; i < packet_size; i++) {
       for (int retries = 10; retries > 0; retries--) {
@@ -1560,6 +1561,7 @@ void reset_to_bootloader() {
   hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
   watchdog_hw->scratch[5] = ENTRY_MAGIC;
   watchdog_hw->scratch[6] = ~ENTRY_MAGIC;
+  led_debug(10, 100);
   watchdog_reboot(0, 0, 0);
 
   while (1) {
@@ -1661,20 +1663,17 @@ void feature_detect() {
 volatile bool uart_enabled = true;
 
 void check_uart_loopback() {
+  // return;
   sleep_ms(10);
-  // led_debug(5, 100);
-  uart_init(UART_ID, BAUD_RATE);
-  gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
-  gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
-
+  init_uart_port();
   // If we read back the same message as sent, then there is a loopback
   // and disable the uart for normal Telemetrix communication.
   while (uart_is_readable(UART_ID)) {
     (void)uart_getc(UART_ID);
     // empty the uart.
   }
-  uint8_t test_message = 0; // send a null character, this shouldn't interfere
-                            // with the tmx-pico-aio implementation.
+  uint8_t test_message = 10; // send a null character, this shouldn't interfere
+                             // with the tmx-pico-aio implementation.
   uint8_t read_byte = 123;
 
   uart_putc_raw(UART_ID, test_message);
@@ -1758,6 +1757,7 @@ int main() {
   stdio_flush();
   check_uart_loopback(); // Mirte-master has pin 0 and 1 tied together, then
   //                        // don't want to use it
+  led_debug(5, 100);
   adc_init();
   // create an array of pin_descriptors for 100 pins
   // establish the digital pin array

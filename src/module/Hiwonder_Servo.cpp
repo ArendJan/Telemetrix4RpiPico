@@ -231,7 +231,9 @@ void Hiwonder_Servo::readModule() {
         this->enabled_servos--;
       }
     }
-    if (pos != servo->lastPublishedPosition) {
+    auto diff = std::abs(pos - servo->lastPublishedPosition);
+    const auto min_diff = 24 * 3; // 3 ticks, or 72 centidegrees
+    if (diff > min_diff) {
       data.push_back(i);
       // Pos is 0...24000 -> 15 bits
       append_range(data, encode_u16(pos));
