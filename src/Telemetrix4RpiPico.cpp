@@ -296,9 +296,9 @@ void set_pin_mode() {
     the_analog_pins[analog_pin].reporting_enabled =
         command_buffer[SET_PIN_MODE_ANALOG_IN_REPORTING_STATE];
     // save the differential value
-    the_analog_pins[analog_pin].differential = decode_u16(
+    the_analog_pins[analog_pin].differential = std::max<int>(1,  decode_u16(
         std::span(command_buffer)
-            .subspan<SET_PIN_MODE_ANALOG_DIFF_HIGH, sizeof(uint16_t)>());
+            .subspan<SET_PIN_MODE_ANALOG_DIFF_HIGH, sizeof(uint16_t)>()));
 
   } break;
   default:
