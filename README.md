@@ -334,7 +334,4 @@ time in ms.
 
 
 ## TODO:
-- analog pin reading numbering change to pin number instead of adc pin
-- feature detection (analog, servos, ...)
-- documentation
-- check docs with new arduino stuff, msg nums and pico specific stuff
+- documentation of modules & sensors
