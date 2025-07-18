@@ -194,7 +194,6 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
     // auto offset = servo->read_angle_offset();
     this->servos.push_back(servo);
     this->enabled_servos++;
-    send_debug_info(13, this->enabled_servos);
     servo->enable();
     std::vector<uint8_t> data = {
         ADD_SERVO,                          // add servo type
@@ -232,7 +231,9 @@ void Hiwonder_Servo::readModule() {
         this->enabled_servos--;
       }
     }
-    if (pos != servo->lastPublishedPosition) {
+    auto diff = std::abs(pos - servo->lastPublishedPosition);
+    const auto min_diff = 24 * 3; // 3 ticks, or 72 centidegrees
+    if (diff > min_diff) {
       data.push_back(i);
       // Pos is 0...24000 -> 15 bits
       append_range(data, encode_u16(pos));

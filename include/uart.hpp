@@ -10,3 +10,4 @@ void serial_write(std::vector<uint8_t> data);
 int get_byte();
 
 void put_byte(uint8_t byte);
+void init_uart_port();
