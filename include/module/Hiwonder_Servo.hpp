@@ -50,4 +50,5 @@ private:
   HiwonderBus *bus = nullptr;
   std::vector<HiwonderServo *> servos = {};
   int enabled_servos = 0;
+  decltype(time_us_32()) last_force_write = 0;
 };
