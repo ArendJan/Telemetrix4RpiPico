@@ -1666,34 +1666,6 @@ void feature_detect() {
   serial_write(id_msg);
 }
 
-volatile bool uart_enabled = true;
-
-void check_uart_loopback() {
-  // return;
-  sleep_ms(10);
-  init_uart_port();
-  // If we read back the same message as sent, then there is a loopback
-  // and disable the uart for normal Telemetrix communication.
-  while (uart_is_readable(UART_ID)) {
-    (void)uart_getc(UART_ID);
-    // empty the uart.
-  }
-  uint8_t test_message = 10; // send a null character, this shouldn't interfere
-                             // with the tmx-pico-aio implementation.
-  uint8_t read_byte = 123;
-
-  uart_putc_raw(UART_ID, test_message);
-  sleep_ms(100);
-
-  if (uart_is_readable(UART_ID)) {
-
-    read_byte = uart_getc(UART_ID);
-    if (read_byte == test_message) {
-      uart_enabled = false;
-      return;
-    }
-  }
-}
 
 bool check_usb_connection() {
   // Read in VBUS pin
@@ -1755,7 +1727,8 @@ int main() {
   gpio_init(LED_PIN);
   gpio_set_dir(LED_PIN, GPIO_OUT);
 
-  stdio_init_all();
+  // stdio_init_all();
+  stdio_usb_init();
   stdio_set_translate_crlf(&stdio_usb, false);
   // #ifdef WITH_UART_STDIO
   // stdio_set_translate_crlf(&stdio_uart, false);
@@ -1831,30 +1804,23 @@ int main() {
 
 
 void core1_main() {
-// led_debug(100, 100);
-  // while(modules.size() < 1) {
-  //   sleep_ms(10);
-  //   led_debug(10, 10);
-  //   // modules.
-  // }
-       auto last_scan = time_us_32();
+  // slow tasks should be done on this core to speed up the main core
+  auto last_scan = time_us_32();
 
-  // auto scan_delay = 1000'000;
   while (true) {
     if(time_us_32() - last_scan >= scan_delay) {
       last_scan += scan_delay;
       // for(auto sensor : sensors) {
       //   sensor->core1_update();
       // }
-      // led_debug(5, 100);
-      // send_debug_info(45, modules.size());
+      
       // Add a memory barrier to signal to GCC that modules may change
       asm volatile("" ::: "memory");
        for(volatile auto module : modules) {
         module->core1_update();
+      }
     }
   }
-}
 }
 
 // Just some checks to make sure the arrays are not changed
