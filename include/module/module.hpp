@@ -18,6 +18,7 @@ public:
   virtual void resetModule() = 0;
   bool stop = false;
   void publishData(const std::vector<uint8_t> &data);
+  virtual void core1_update() =0;
 
   int num = 0;
   MODULE_TYPES type = MODULE_TYPES::MAX_MODULES;

@@ -10,6 +10,7 @@ class TmxSSD1306 : public Module {
 public:
   void readModule();
   void writeModule(std::vector<uint8_t> &data);
+  void core1_update(){};
   void resetModule();
   void updModule();
   enum MessageType : uint8_t {

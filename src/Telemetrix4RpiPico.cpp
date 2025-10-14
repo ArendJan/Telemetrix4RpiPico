@@ -44,6 +44,8 @@
 
 #include "Telemetrix4RpiPico.hpp"
 #include "serialization.hpp"
+
+#include <functional>
 /*******************************************************************
  *              GLOBAL VARIABLES, AND STORAGE
  ******************************************************************/
@@ -278,13 +280,15 @@ void set_pin_mode() {
     float divider = (float)(f_sys / 1'000'000UL); // run the pwm clock at 1MHz
     pwm_set_clkdiv(slice_num,
                    divider);      // pwm clock should now be running at 1MHz
-    top = 1'000'000UL / f_hz - 1; // calculate the TOP value
+    const auto top_v = 1'000'000UL / f_hz - 1; // calculate the TOP value
+    top = top_v;
     pwm_set_wrap(slice_num, (uint16_t)top);
     // set the current level to 0
     pwm_set_gpio_level(pin, 0);
 
     pwm_set_enabled(slice_num, true); // let's go!
     gpio_set_function(pin, GPIO_FUNC_PWM);
+    static_assert(top_v == 19999, "Top is not 19999");
     break;
   }
   case PIN_MODES::ANALOG_INPUT: {
@@ -1186,7 +1190,7 @@ void scan_sonars() {
     }
     sonar->last_dist = distance;
 
-    sonar_report_message[SONAR_TRIG_PIN] = (uint8_t)sonar->trig_pin;
+    sonar_report_message[SONAR_TRIG_PIN] = (uint8_t)sonar->echo_pin;
     sonar_report_message[M_WHOLE_VALUE] =
         (uint8_t)(distance >> 8); // high byte, not M
     sonar_report_message[CM_WHOLE_VALUE] =
@@ -1743,7 +1747,7 @@ std::vector<Module *> modules;
 /***************************************************************
  *                  MAIN FUNCTION
  ****************************************************************/
-
+void core1_main();
 int main() {
   // gpio_init(14);
   // gpio_set_dir(14, GPIO_OUT);
@@ -1793,6 +1797,10 @@ int main() {
 
   // infinite loop
   uint32_t last_scan = 0;
+
+  // start second core
+  multicore_launch_core1(core1_main);
+
   while (true) {
     // watchdog_update();
     get_next_command();
@@ -1819,6 +1827,34 @@ int main() {
       }
     }
   }
+}
+
+
+void core1_main() {
+// led_debug(100, 100);
+  // while(modules.size() < 1) {
+  //   sleep_ms(10);
+  //   led_debug(10, 10);
+  //   // modules.
+  // }
+       auto last_scan = time_us_32();
+
+  // auto scan_delay = 1000'000;
+  while (true) {
+    if(time_us_32() - last_scan >= scan_delay) {
+      last_scan += scan_delay;
+      // for(auto sensor : sensors) {
+      //   sensor->core1_update();
+      // }
+      // led_debug(5, 100);
+      // send_debug_info(45, modules.size());
+      // Add a memory barrier to signal to GCC that modules may change
+      asm volatile("" ::: "memory");
+       for(volatile auto module : modules) {
+        module->core1_update();
+    }
+  }
+}
 }
 
 // Just some checks to make sure the arrays are not changed

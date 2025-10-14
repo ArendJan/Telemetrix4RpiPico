@@ -237,11 +237,7 @@ public:
   int32_t staticOffset = 0;
   int32_t maxCentDegrees = 240000;
   int32_t minCentDegrees = 0;
-  bool disabled = false;
-  int fault_count = 0;
-
-  // Used for telemetrix to only publish on change:
-  int32_t lastPublishedPosition = 0;
+  
 
   uint8_t _id = BROADCAST_ID;
   HiwonderServo(HiwonderBus *bus, int id) : _bus(bus), _id(id) {}

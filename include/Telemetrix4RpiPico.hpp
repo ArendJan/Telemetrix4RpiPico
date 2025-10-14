@@ -13,6 +13,7 @@
 #include "hardware/pwm.h"
 #include "hardware/spi.h"
 #include "hardware/watchdog.h"
+#include "pico/multicore.h"
 #include "i2c_helpers.hpp"
 #include "math.h"
 #include "module/module.hpp"
