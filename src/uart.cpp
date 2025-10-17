@@ -1,7 +1,7 @@
 #include "Telemetrix4RpiPico.hpp"
 #include "pico/stdio.h"
-#include "pico/stdio_usb.h"
 #include "pico/stdio_uart.h"
+#include "pico/stdio_usb.h"
 /*************************************************
  * Write data to serial interface
  * @param buffer
@@ -24,16 +24,13 @@ void serial_write(std::vector<uint8_t> data) {
     putchar_raw(byte);
     // uart_putc_raw(UART_ID, byte);
   }
-
 }
 
-void put_byte(uint8_t byte) {
-  putchar_raw(byte);
-}
+void put_byte(uint8_t byte) { putchar_raw(byte); }
 
 int get_byte() {
-  // // If there is no uart loopback, then also check the uart for incoming data.
-  // if (uart_enabled) {
+  // // If there is no uart loopback, then also check the uart for incoming
+  // data. if (uart_enabled) {
   //   if (uart_is_readable(UART_ID)) {
   //     return uart_getc(UART_ID);
   //   }
@@ -50,8 +47,6 @@ void init_uart_port() {
   uart_set_hw_flow(UART_ID, false, false);
   uart_set_fifo_enabled(UART_ID, true);
 }
-
-
 
 volatile bool uart_enabled = true;
 
@@ -80,11 +75,10 @@ void check_uart_loopback() {
       // return;
     }
   }
-  if(uart_enabled) {
+  if (uart_enabled) {
     stdio_uart_init();
     stdio_set_translate_crlf(&stdio_uart, false);
     stdio_set_driver_enabled(&stdio_uart, true);
     stdio_flush();
   }
-
 }

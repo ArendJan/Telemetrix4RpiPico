@@ -237,7 +237,6 @@ public:
   int32_t staticOffset = 0;
   int32_t maxCentDegrees = 240000;
   int32_t minCentDegrees = 0;
-  
 
   uint8_t _id = BROADCAST_ID;
   HiwonderServo(HiwonderBus *bus, int id) : _bus(bus), _id(id) {}

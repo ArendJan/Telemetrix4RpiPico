@@ -26,10 +26,11 @@ Hiwonder_Servo::Hiwonder_Servo(std::vector<uint8_t> &data) {
   if (data.size() != (uint8_t)(servos + 4)) {
     return;
   }
-  
+
   this->bus = new HiwonderBus();
   mutex_init(&this->bus_mutex);
-  send_debug_info_dis(10, __LINE__); mutex_enter_blocking(&this->bus_mutex);
+  send_debug_info_dis(10, __LINE__);
+  mutex_enter_blocking(&this->bus_mutex);
   this->bus->begin(uart, rxPin, txPin);
   this->servos.reserve(servos);
   for (auto i = 0; i < servos; i++) {
@@ -42,7 +43,8 @@ Hiwonder_Servo::Hiwonder_Servo(std::vector<uint8_t> &data) {
     this->enabled_servos++;
   }
   this->bus->enableAll();
-  send_debug_info_dis(9, __LINE__); mutex_exit(&this->bus_mutex);
+  send_debug_info_dis(9, __LINE__);
+  mutex_exit(&this->bus_mutex);
 }
 
 bool Hiwonder_Servo::writeSingle(std::vector<uint8_t> &data, size_t i,
@@ -64,14 +66,15 @@ bool Hiwonder_Servo::writeSingle(std::vector<uint8_t> &data, size_t i,
   }
   // get mutex
   send_debug_info_dis(10, __LINE__);
-  if(!mutex_try_enter(&this->servos[servoI]->mutex, NULL)){
+  if (!mutex_try_enter(&this->servos[servoI]->mutex, NULL)) {
     send_debug_info_dis(30, 4);
     return false;
   }
   this->servos[servoI]->lastwritePosition = angle;
   this->servos[servoI]->updated_write = true;
   this->servos[servoI]->write_time = time;
-  send_debug_info_dis(9, __LINE__); mutex_exit(&this->servos[servoI]->mutex);
+  send_debug_info_dis(9, __LINE__);
+  mutex_exit(&this->servos[servoI]->mutex);
   // if (single) {
   //   this->servos[servoI]->servo.move_time(angle, time);
   // } else {
@@ -79,7 +82,8 @@ bool Hiwonder_Servo::writeSingle(std::vector<uint8_t> &data, size_t i,
   // }
 
   // // repair servo if it was disabled
-  // if (this->servos[servoI]->servo.isCommandOk() && this->servos[servoI]->disabled) {
+  // if (this->servos[servoI]->servo.isCommandOk() &&
+  // this->servos[servoI]->disabled) {
   //   this->servos[servoI]->fault_count = 0;
   //   this->servos[servoI]->disabled = false;
   //   this->enabled_servos++;
@@ -114,7 +118,8 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
   } else if (msg_type == ENABLE) { // enable msg
     auto count = data[1];
     auto enabled = data[2];
-    send_debug_info_dis(10, __LINE__); mutex_enter_blocking(&this->bus_mutex);
+    send_debug_info_dis(10, __LINE__);
+    mutex_enter_blocking(&this->bus_mutex);
     if (count == 0) { // all servos
       if (enabled) {
         this->bus->enableAll();
@@ -134,16 +139,20 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
         this->servos[servoI]->servo.disable();
       }
     }
-    send_debug_info_dis(9, __LINE__); mutex_exit(&this->bus_mutex);
+    send_debug_info_dis(9, __LINE__);
+    mutex_exit(&this->bus_mutex);
   } else if (msg_type == ID_WRITE) { // update id
     auto new_id = data[1];
-    send_debug_info_dis(10, __LINE__); mutex_enter_blocking(&this->bus_mutex);
+    send_debug_info_dis(10, __LINE__);
+    mutex_enter_blocking(&this->bus_mutex);
     this->bus->id_write(new_id);
-    send_debug_info_dis(9, __LINE__); mutex_exit(&this->bus_mutex);
+    send_debug_info_dis(9, __LINE__);
+    mutex_exit(&this->bus_mutex);
   } else if (msg_type == ID_VERIFY) {
     // id read
     auto check_id = data[1];
-    send_debug_info_dis(10, __LINE__); mutex_enter_blocking(&this->bus_mutex);
+    send_debug_info_dis(10, __LINE__);
+    mutex_enter_blocking(&this->bus_mutex);
     HiwonderServo tempServo(this->bus, check_id);
     bool ok = tempServo.id_verify() == check_id;
     // ok = true;
@@ -152,7 +161,8 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
         check_id,    // id
         (uint8_t)ok, // ok
     };
-    send_debug_info_dis(9, __LINE__); mutex_exit(&this->bus_mutex);
+    send_debug_info_dis(9, __LINE__);
+    mutex_exit(&this->bus_mutex);
     this->publishData(data);
   } else if (msg_type == RANGE_WRITE) {
     // range write
@@ -162,22 +172,27 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
                                                    //<< 8) | data[3];
     int16_t max = decode_u16(
         data_span.subspan<4, sizeof(uint16_t)>()); //((int16_t)data[4]
-                                                   //<< 8) | data[5];
-                                                   send_debug_info_dis(10, __LINE__); mutex_enter_blocking(&this->bus_mutex);
+    //<< 8) | data[5];
+    send_debug_info_dis(10, __LINE__);
+    mutex_enter_blocking(&this->bus_mutex);
     this->servos[id]->servo.setLimitsTicks(min / 24,
-                                     max / 24); // 24 centidegrees per tick
-                                     send_debug_info_dis(9, __LINE__); mutex_exit(&this->bus_mutex);
+                                           max /
+                                               24); // 24 centidegrees per tick
+    send_debug_info_dis(9, __LINE__);
+    mutex_exit(&this->bus_mutex);
   } else if (msg_type == RANGE_READ) {
     // read range of servo stored in servo
 
     auto id = data[1];
     // send_debug_info_dis(10, id);
     // send_debug_info_dis(11, this->servos.size());
-    send_debug_info_dis(10, __LINE__); mutex_enter_blocking(&this->bus_mutex);
+    send_debug_info_dis(10, __LINE__);
+    mutex_enter_blocking(&this->bus_mutex);
     send_debug_info_dis(10, __LINE__);
     // this->servos[id]->servo.readLimits();
 
-    send_debug_info_dis(9, __LINE__); mutex_exit(&this->bus_mutex);
+    send_debug_info_dis(9, __LINE__);
+    mutex_exit(&this->bus_mutex);
     auto min = this->servos[id]->servo.minCentDegrees;
     auto max = this->servos[id]->servo.maxCentDegrees;
     std::vector<uint8_t> data = {RANGE_READ, // id check type
@@ -195,17 +210,21 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
         data_span.subspan<2, sizeof(int16_t)>()); //((int16_t)data[2] << 8) |
                                                   // data[3];
     offset /= 24;
-    send_debug_info_dis(10, __LINE__); mutex_enter_blocking(&this->bus_mutex);
+    send_debug_info_dis(10, __LINE__);
+    mutex_enter_blocking(&this->bus_mutex);
     this->servos[id]->servo.angle_offset_adjust(offset);
     this->servos[id]->servo.angle_offset_save();
-    send_debug_info_dis(9, __LINE__); mutex_exit(&this->bus_mutex);
+    send_debug_info_dis(9, __LINE__);
+    mutex_exit(&this->bus_mutex);
   } else if (msg_type == OFFSET_READ) {
     auto id = data[1];
-    send_debug_info_dis(10, __LINE__); mutex_enter_blocking(&this->bus_mutex);
+    send_debug_info_dis(10, __LINE__);
+    mutex_enter_blocking(&this->bus_mutex);
     int16_t offset =
         (int8_t)this->servos[id]
             ->servo.read_angle_offset(); // read back as uint8_t, but is signed.
-    send_debug_info_dis(9, __LINE__); mutex_exit(&this->bus_mutex);
+    send_debug_info_dis(9, __LINE__);
+    mutex_exit(&this->bus_mutex);
     offset *= 24;
     std::vector<uint8_t> data = {OFFSET_READ, // offset type
                                  id};         // id
@@ -217,20 +236,25 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
     // TODO: Shouldn't this use more bytes?
     uint32_t vMin = decode_u16(data_span.subspan<2, sizeof(uint16_t)>());
     uint32_t vMax = decode_u16(data_span.subspan<4, sizeof(uint16_t)>());
-    send_debug_info_dis(10, __LINE__); mutex_enter_blocking(&this->bus_mutex);
+    send_debug_info_dis(10, __LINE__);
+    mutex_enter_blocking(&this->bus_mutex);
     this->servos[id]->servo.setVoltageLimits(vMin, vMax);
-    send_debug_info_dis(9, __LINE__); mutex_exit(&this->bus_mutex);
+    send_debug_info_dis(9, __LINE__);
+    mutex_exit(&this->bus_mutex);
   } else if (msg_type == MOTOR_MODE_WRITE) { // motor mode write
     auto id = data[1];
     uint16_t speed = decode_i16(data_span.subspan<2, sizeof(uint16_t)>());
-    send_debug_info_dis(10, __LINE__); mutex_enter_blocking(&this->bus_mutex);
+    send_debug_info_dis(10, __LINE__);
+    mutex_enter_blocking(&this->bus_mutex);
     this->servos[id]->servo.motor_mode(speed);
-    send_debug_info_dis(9, __LINE__); mutex_exit(&this->bus_mutex);
-  } 
-   if (msg_type == ADD_SERVO) {
+    send_debug_info_dis(9, __LINE__);
+    mutex_exit(&this->bus_mutex);
+  }
+  if (msg_type == ADD_SERVO) {
     // This is the actual servo ID
     auto id = data[1];
-    send_debug_info_dis(10, __LINE__); mutex_enter_blocking(&this->bus_mutex);
+    send_debug_info_dis(10, __LINE__);
+    mutex_enter_blocking(&this->bus_mutex);
     auto servo = new HiwonderServoItem(this->bus, id);
     mutex_init(&servo->mutex);
     servo->servo.initialize();
@@ -239,7 +263,8 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
     this->enabled_servos++;
     servo->servo.enable();
 
-    send_debug_info_dis(9, __LINE__); mutex_exit(&this->bus_mutex);
+    send_debug_info_dis(9, __LINE__);
+    mutex_exit(&this->bus_mutex);
     std::vector<uint8_t> data = {
         ADD_SERVO,                          // add servo type
         id,                                 // id
@@ -252,8 +277,8 @@ void Hiwonder_Servo::writeModule(std::vector<uint8_t> &data) {
 const uint LED_PIN = 25; // board LED
 
 void Hiwonder_Servo::core1_update() {
-    // led_debug(10, 100);
-    // return;
+  // led_debug(10, 100);
+  // return;
 
   //  if (!timeout_safe()) {
   //   return;
@@ -264,7 +289,7 @@ void Hiwonder_Servo::core1_update() {
     send_debug_info_dis(30, 0);
     return;
   }
-  if(!mutex_try_enter(&this->bus_mutex, NULL)){
+  if (!mutex_try_enter(&this->bus_mutex, NULL)) {
     send_debug_info_dis(30, 1);
     // led_debug(10, 100);
     return;
@@ -275,7 +300,7 @@ void Hiwonder_Servo::core1_update() {
       send_debug_info_dis(30, 4);
       continue;
     }
-    if(!mutex_try_enter(&servo->mutex, NULL)){
+    if (!mutex_try_enter(&servo->mutex, NULL)) {
       send_debug_info_dis(30, 3);
       continue;
     }
@@ -289,15 +314,15 @@ void Hiwonder_Servo::core1_update() {
         this->enabled_servos--;
       }
     }
-  //  int32_t pos= time_us_32();
-        auto diff = std::abs(pos - servo->lastPublishedPosition);
-    const auto min_diff = 1;//24 * 3; // 3 ticks, or 72 centidegrees
+    //  int32_t pos= time_us_32();
+    auto diff = std::abs(pos - servo->lastPublishedPosition);
+    const auto min_diff = 1; // 24 * 3; // 3 ticks, or 72 centidegrees
 
-    if(diff > min_diff){
+    if (diff > min_diff) {
       servo->updated_read = true;
       servo->lastPublishedPosition = pos;
     }
-    servo->lastreadPosition= pos;
+    servo->lastreadPosition = pos;
 
     // writing updates
     if (servo->updated_write) {
@@ -305,14 +330,12 @@ void Hiwonder_Servo::core1_update() {
       servo->servo.move_time(servo->lastwritePosition, servo->write_time);
       servo->updated_write = false;
     }
-    // send_debug_info_dis(30, __LINE__); 
+    // send_debug_info_dis(30, __LINE__);
     mutex_exit(&servo->mutex);
   }
   send_debug_info_dis(30, __LINE__);
-   mutex_exit(&this->bus_mutex);
+  mutex_exit(&this->bus_mutex);
 }
-
-
 
 void Hiwonder_Servo::readModule() {
   if (!timeout_safe()) {
@@ -331,14 +354,14 @@ void Hiwonder_Servo::readModule() {
       i++;
       continue;
     }
-    if(!mutex_try_enter(&servo->mutex, NULL)){
+    if (!mutex_try_enter(&servo->mutex, NULL)) {
       i++;
       // send_debug_info_dis(30, 4);
       continue;
     }
     if (servo->updated_read || time_us_32() - this->last_force_write >
-                               1'000'000) { // force write every second
-                                // send_debug_info_dis(10, __LINE__);
+                                   1'000'000) { // force write every second
+      // send_debug_info_dis(10, __LINE__);
       servo->updated_read = false;
       data.push_back(i);
       // Pos is 0...24000 -> 15 bits
@@ -347,7 +370,7 @@ void Hiwonder_Servo::readModule() {
       append_range(data, encode_u16(pos));
       this->last_force_write = time_us_32();
     }
-    // send_debug_info_dis(9, __LINE__); 
+    // send_debug_info_dis(9, __LINE__);
     mutex_exit(&servo->mutex);
     i++;
   }

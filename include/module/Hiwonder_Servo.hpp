@@ -1,7 +1,7 @@
 #pragma once
+#include <span>
 #include <stdlib.h>
 #include <vector>
-#include <span>
 
 #include "drivers/HiwonderServo.hpp"
 
@@ -10,20 +10,19 @@
 #include <pico/sync.h>
 class HiwonderServoItem {
 public:
-HiwonderServo servo;
-volatile bool updated_read = false;
-volatile bool updated_write = false;
-volatile int32_t lastreadPosition = 0;
-volatile int32_t lastwritePosition = 0;
-volatile int32_t write_time = 0;
-bool disabled = false;
+  HiwonderServo servo;
+  volatile bool updated_read = false;
+  volatile bool updated_write = false;
+  volatile int32_t lastreadPosition = 0;
+  volatile int32_t lastwritePosition = 0;
+  volatile int32_t write_time = 0;
+  bool disabled = false;
   int fault_count = 0;
   mutex_t mutex; // for reading and writing updated and position
 
   // Used for telemetrix to only publish on change:
   int32_t lastPublishedPosition = 0;
-HiwonderServoItem(HiwonderBus *bus, int id) : servo(bus, id) {}
-
+  HiwonderServoItem(HiwonderBus *bus, int id) : servo(bus, id) {}
 };
 
 class Hiwonder_Servo : public Module {

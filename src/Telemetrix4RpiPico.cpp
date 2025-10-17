@@ -279,7 +279,7 @@ void set_pin_mode() {
     uint32_t f_sys = clock_get_hz(clk_sys);
     float divider = (float)(f_sys / 1'000'000UL); // run the pwm clock at 1MHz
     pwm_set_clkdiv(slice_num,
-                   divider);      // pwm clock should now be running at 1MHz
+                   divider); // pwm clock should now be running at 1MHz
     const auto top_v = 1'000'000UL / f_hz - 1; // calculate the TOP value
     top = top_v;
     pwm_set_wrap(slice_num, (uint16_t)top);
@@ -1666,7 +1666,6 @@ void feature_detect() {
   serial_write(id_msg);
 }
 
-
 bool check_usb_connection() {
   // Read in VBUS pin
   // NOTE: this does not work with a pico W, as the VBUS pin is connected to the
@@ -1802,21 +1801,20 @@ int main() {
   }
 }
 
-
 void core1_main() {
   // slow tasks should be done on this core to speed up the main core
   auto last_scan = time_us_32();
 
   while (true) {
-    if(time_us_32() - last_scan >= scan_delay) {
+    if (time_us_32() - last_scan >= scan_delay) {
       last_scan += scan_delay;
       // for(auto sensor : sensors) {
       //   sensor->core1_update();
       // }
-      
+
       // Add a memory barrier to signal to GCC that modules may change
       asm volatile("" ::: "memory");
-       for(volatile auto module : modules) {
+      for (volatile auto module : modules) {
         module->core1_update();
       }
     }
