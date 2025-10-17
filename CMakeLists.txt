@@ -100,11 +100,11 @@ target_link_libraries(
   pico_ssd1306)
 
 set(SKIP_BOOTLOADER_ENTRY_PIN 1)
-# add_subdirectory(rp2040-serial-bootloader)
+add_subdirectory(rp2040-serial-bootloader)
 # pico_set_linker_script(Telemetrix4RpiPico
 # ${CMAKE_CURRENT_SOURCE_DIR}/blink_noboot2.ld)
 
-# bootloader_build_combined(Telemetrix4RpiPico)
+bootloader_build_combined(Telemetrix4RpiPico)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_custom_target(

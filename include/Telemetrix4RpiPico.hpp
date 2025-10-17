@@ -108,7 +108,6 @@ void feature_detect();
 void encoder_new();
 
 void check_uart_loopback();
-extern volatile bool uart_enabled;
 #define UART_ID uart0
 #define BAUD_RATE 115200
 #define UART_TX_PIN 0
