@@ -10,6 +10,7 @@ public:
   void readModule();
   void writeModule(std::vector<uint8_t> &data);
   void updateOne(std::vector<uint8_t> &data, size_t i);
+  void core1_update() {};
   void resetModule();
   enum REGISTERS : uint8_t {
     LEDn_DIFF = 0x04,

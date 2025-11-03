@@ -1,3 +1,22 @@
+# == DO NOT EDIT THE FOLLOWING LINES for the Raspberry Pi Pico VS Code Extension
+# to work ==
+if(WIN32)
+  set(USERHOME $ENV{USERPROFILE})
+else()
+  set(USERHOME $ENV{HOME})
+endif()
+set(sdkVersion 2.2.0)
+set(toolchainVersion 14_2_Rel1)
+set(picotoolVersion 2.2.0-a4)
+set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
+if(EXISTS ${picoVscode})
+  include(${picoVscode})
+endif()
+# ====================================================================================
+set(PICO_BOARD
+    pico
+    CACHE STRING "Board type")
+
 cmake_minimum_required(VERSION 3.12...4.0)
 set(CMAKE_CXX_STANDARD 20)
 
@@ -61,7 +80,7 @@ target_include_directories(Telemetrix4RpiPico
 pico_generate_pio_header(Telemetrix4RpiPico
                          ${CMAKE_CURRENT_LIST_DIR}/src/Telemetrix4RpiPico.pio)
 pico_enable_stdio_usb(Telemetrix4RpiPico 1)
-pico_enable_stdio_uart(Telemetrix4RpiPico 0) # TODO: For master version this
+pico_enable_stdio_uart(Telemetrix4RpiPico 1) # TODO: For master version this
                                              # must be disabled
 pico_add_extra_outputs(Telemetrix4RpiPico)
 add_subdirectory(pico-ssd1306)
@@ -80,6 +99,7 @@ target_link_libraries(
   hardware_spi
   hardware_flash
   pico_sync
+  pico_multicore
   pico_ssd1306)
 
 set(SKIP_BOOTLOADER_ENTRY_PIN 1)

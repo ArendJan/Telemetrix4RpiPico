@@ -16,6 +16,7 @@
 #include "i2c_helpers.hpp"
 #include "math.h"
 #include "module/module.hpp"
+#include "pico/multicore.h"
 #include "pico/stdlib.h"
 #include "pico/unique_id.h"
 #include "sensors/sensor.hpp"
@@ -107,7 +108,6 @@ void feature_detect();
 void encoder_new();
 
 void check_uart_loopback();
-extern volatile bool uart_enabled;
 #define UART_ID uart0
 #define BAUD_RATE 115200
 #define UART_TX_PIN 0

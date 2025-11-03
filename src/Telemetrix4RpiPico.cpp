@@ -44,6 +44,8 @@
 
 #include "Telemetrix4RpiPico.hpp"
 #include "serialization.hpp"
+
+#include <functional>
 /*******************************************************************
  *              GLOBAL VARIABLES, AND STORAGE
  ******************************************************************/
@@ -277,14 +279,16 @@ void set_pin_mode() {
     uint32_t f_sys = clock_get_hz(clk_sys);
     float divider = (float)(f_sys / 1'000'000UL); // run the pwm clock at 1MHz
     pwm_set_clkdiv(slice_num,
-                   divider);      // pwm clock should now be running at 1MHz
-    top = 1'000'000UL / f_hz - 1; // calculate the TOP value
+                   divider); // pwm clock should now be running at 1MHz
+    const auto top_v = 1'000'000UL / f_hz - 1; // calculate the TOP value
+    top = top_v;
     pwm_set_wrap(slice_num, (uint16_t)top);
     // set the current level to 0
     pwm_set_gpio_level(pin, 0);
 
     pwm_set_enabled(slice_num, true); // let's go!
     gpio_set_function(pin, GPIO_FUNC_PWM);
+    static_assert(top_v == 19999, "Top is not 19999");
     break;
   }
   case PIN_MODES::ANALOG_INPUT: {
@@ -1186,7 +1190,7 @@ void scan_sonars() {
     }
     sonar->last_dist = distance;
 
-    sonar_report_message[SONAR_TRIG_PIN] = (uint8_t)sonar->trig_pin;
+    sonar_report_message[SONAR_TRIG_PIN] = (uint8_t)sonar->echo_pin;
     sonar_report_message[M_WHOLE_VALUE] =
         (uint8_t)(distance >> 8); // high byte, not M
     sonar_report_message[CM_WHOLE_VALUE] =
@@ -1662,35 +1666,6 @@ void feature_detect() {
   serial_write(id_msg);
 }
 
-volatile bool uart_enabled = true;
-
-void check_uart_loopback() {
-  // return;
-  sleep_ms(10);
-  init_uart_port();
-  // If we read back the same message as sent, then there is a loopback
-  // and disable the uart for normal Telemetrix communication.
-  while (uart_is_readable(UART_ID)) {
-    (void)uart_getc(UART_ID);
-    // empty the uart.
-  }
-  uint8_t test_message = 10; // send a null character, this shouldn't interfere
-                             // with the tmx-pico-aio implementation.
-  uint8_t read_byte = 123;
-
-  uart_putc_raw(UART_ID, test_message);
-  sleep_ms(100);
-
-  if (uart_is_readable(UART_ID)) {
-
-    read_byte = uart_getc(UART_ID);
-    if (read_byte == test_message) {
-      uart_enabled = false;
-      return;
-    }
-  }
-}
-
 bool check_usb_connection() {
   // Read in VBUS pin
   // NOTE: this does not work with a pico W, as the VBUS pin is connected to the
@@ -1743,7 +1718,7 @@ std::vector<Module *> modules;
 /***************************************************************
  *                  MAIN FUNCTION
  ****************************************************************/
-
+void core1_main();
 int main() {
   // gpio_init(14);
   // gpio_set_dir(14, GPIO_OUT);
@@ -1751,7 +1726,8 @@ int main() {
   gpio_init(LED_PIN);
   gpio_set_dir(LED_PIN, GPIO_OUT);
 
-  stdio_init_all();
+  // stdio_init_all();
+  stdio_usb_init();
   stdio_set_translate_crlf(&stdio_usb, false);
   // #ifdef WITH_UART_STDIO
   // stdio_set_translate_crlf(&stdio_uart, false);
@@ -1793,6 +1769,10 @@ int main() {
 
   // infinite loop
   uint32_t last_scan = 0;
+
+  // start second core
+  multicore_launch_core1(core1_main);
+
   while (true) {
     // watchdog_update();
     get_next_command();
@@ -1816,6 +1796,26 @@ int main() {
       }
       for (auto module : modules) {
         module->updModule();
+      }
+    }
+  }
+}
+
+void core1_main() {
+  // slow tasks should be done on this core to speed up the main core
+  auto last_scan = time_us_32();
+
+  while (true) {
+    if (time_us_32() - last_scan >= scan_delay) {
+      last_scan += scan_delay;
+      // for(auto sensor : sensors) {
+      //   sensor->core1_update();
+      // }
+
+      // Add a memory barrier to signal to GCC that modules may change
+      asm volatile("" ::: "memory");
+      for (volatile auto module : modules) {
+        module->core1_update();
       }
     }
   }
