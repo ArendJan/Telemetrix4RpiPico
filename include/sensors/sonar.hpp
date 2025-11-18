@@ -13,6 +13,7 @@ typedef struct hc_sr04_descriptor {
   uint32_t start_time;
   uint32_t last_time_diff;
   int last_dist;
+  bool single_pin;
 } hc_sr04_descriptor;
 
 // this structure holds an index into the sonars array

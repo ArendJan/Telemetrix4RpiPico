@@ -2,8 +2,14 @@
 #include "Telemetrix4RpiPico.hpp"
 
 // sonar report message
-int sonar_report_message[] = {4, SONAR_DISTANCE, SONAR_TRIG_PIN, M_WHOLE_VALUE,
+
+int sonar_report_message[] = {5,
+                              SONAR_DISTANCE,
+                              SONAR_TRIG_PIN,
+                              SONAR_ECHO_PIN,
+                              M_WHOLE_VALUE,
                               CM_WHOLE_VALUE};
+// static_assert(sonar_report_message[0] == sizeof(sonar_report_message));
 sonar_data the_hc_sr04s = {.next_sonar_index = 0,
                            .trigger_timer = {},
                            .trigger_mask = 0,
@@ -43,7 +49,12 @@ void sonar_new() {
   the_hc_sr04s.trigger_mask |= 1ul << trig_pin;
   gpio_init(trig_pin);
   gpio_set_dir(trig_pin, GPIO_OUT);
-  gpio_init(echo_pin);
+  if (trig_pin != echo_pin) {
+    gpio_init(echo_pin);
+    the_hc_sr04s.sonars[sonar_count].single_pin = false;
+  } else {
+    the_hc_sr04s.sonars[sonar_count].single_pin = true;
+  }
   gpio_set_dir(echo_pin, GPIO_IN);
   gpio_set_irq_enabled_with_callback(
       echo_pin, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &sonar_callback);
@@ -95,13 +106,21 @@ bool sonar_timer_callback(repeating_timer_t *rt) {
   // results in 10Hz per sonar, without crosstalk.
   static uint8_t sonar_counter = 0;
   auto sonar_pin = the_hc_sr04s.sonars[sonar_counter].trig_pin;
+  auto sonar_single = the_hc_sr04s.sonars[sonar_counter].single_pin;
   sonar_counter++;
   if (sonar_counter > sonar_count) {
     sonar_counter = 0;
   }
+
+  if (sonar_single) {
+    gpio_set_dir(sonar_pin, GPIO_OUT);
+  }
   gpio_put(sonar_pin, 1);
   busy_wait_us(10); // TODO maybe: change this timer to other core to not block
   gpio_put(sonar_pin, 0);
+  if (sonar_single) {
+    gpio_set_dir(sonar_pin, GPIO_IN);
+  }
   return true;
 }
 
@@ -115,7 +134,7 @@ void scan_sonars() {
       0) { // mutex not initialized and don't need to scan the empty list
     return;
   }
-  if (!mutex_enter_timeout_us(&the_hc_sr04s.mutex, 10)) {
+  if (!mutex_try_enter(&the_hc_sr04s.mutex, NULL)) {
     // also don't update the last_scan variable
     return;
   }
@@ -144,12 +163,15 @@ void scan_sonars() {
     }
     sonar->last_dist = distance;
 
-    sonar_report_message[SONAR_TRIG_PIN] = (uint8_t)sonar->echo_pin;
+    sonar_report_message[SONAR_TRIG_PIN] = (uint8_t)sonar->trig_pin;
+    sonar_report_message[SONAR_ECH_PIN] = (uint8_t)sonar->echo_pin;
     sonar_report_message[M_WHOLE_VALUE] =
         (uint8_t)(distance >> 8); // high byte, not M
     sonar_report_message[CM_WHOLE_VALUE] =
         (distance) & 0xFF; // low byte, not CM anymore
-    serial_write(sonar_report_message, 5);
+    static_assert(
+        sizeof(sonar_report_message) / sizeof(sonar_report_message[0]) == 6);
+    serial_write(sonar_report_message, 6);
     sonar->last_time_diff = -1; // signal for next loop that there's no new data
   }
   mutex_exit(&the_hc_sr04s.mutex);
