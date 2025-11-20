@@ -296,8 +296,9 @@ typedef enum { SINGLE = 1, QUADRATURE = 2 } ENCODER_TYPES;
 
 // sonar report buffer offsets
 #define SONAR_TRIG_PIN 2
-#define M_WHOLE_VALUE 3
-#define CM_WHOLE_VALUE 4
+#define SONAR_ECH_PIN 3
+#define M_WHOLE_VALUE 4
+#define CM_WHOLE_VALUE 5
 
 // dht report buffer offset
 #define DHT_REPORT_PIN 2

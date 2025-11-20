@@ -61,6 +61,7 @@ add_executable(
   src/sensors/ina226_sensor.cpp
   src/sensors/mpu9250_sensor.cpp
   src/sensors/sensor.cpp
+  src/sensors/sonar.cpp
   src/sensors/veml6040_sensor.cpp
   src/sensors/vl53l0x_sensor.cpp)
 find_package(Git REQUIRED)

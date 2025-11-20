@@ -131,25 +131,6 @@ typedef struct analog_pin_descriptor {
   int differential;       // difference between current and last value needed
 } analog_pin_descriptor;
 
-// This structure describes an HC-SR04 type device
-typedef struct hc_sr04_descriptor {
-  uint trig_pin; // trigger pin
-  uint echo_pin; // echo pin
-  uint32_t start_time;
-  uint32_t last_time_diff;
-  int last_dist;
-} hc_sr04_descriptor;
-
-// this structure holds an index into the sonars array
-// and the sonars array
-typedef struct sonar_data {
-  int next_sonar_index;
-  repeating_timer_t trigger_timer;
-  uint32_t trigger_mask;
-  hc_sr04_descriptor sonars[MAX_SONARS];
-  mutex_t mutex;
-} sonar_data;
-
 // this structure describes a DHT type device
 typedef struct dht_descriptor {
   uint data_pin; // data pin
@@ -201,7 +182,7 @@ void sensor_new();
 void readSensors();
 extern std::vector<Sensor *> sensors;
 void reportBytes(std::vector<uint8_t>);
-
+extern uint8_t command_buffer[MAX_COMMAND_LENGTH];
 // class Shutdown_Relay : public Module {
 // public:
 //   Shutdown_Relay(std::vector<uint8_t> &data);
