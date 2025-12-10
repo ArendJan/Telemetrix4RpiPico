@@ -71,6 +71,8 @@ void sonar_new() {
 }
 
 void sonar_callback(uint gpio, uint32_t events) {
+  auto time = time_us_32(); // record time at start, then processing wont have
+                            // any influence.
   if (events & GPIO_IRQ_EDGE_FALL) {
     // stop time
     for (int i = 0; i <= sonar_count; i++) {
@@ -83,7 +85,7 @@ void sonar_callback(uint gpio, uint32_t events) {
         }
         // only need mutex on this update, as start_time is only read/updated in
         // this interrupt
-        sonar->last_time_diff = time_us_32() - sonar->start_time;
+        sonar->last_time_diff = time - sonar->start_time;
         mutex_exit(&the_hc_sr04s.mutex);
         return;
       }
@@ -93,7 +95,7 @@ void sonar_callback(uint gpio, uint32_t events) {
     for (int i = 0; i <= sonar_count; i++) {
       hc_sr04_descriptor *sonar = &the_hc_sr04s.sonars[i];
       if (gpio == sonar->echo_pin) {
-        sonar->start_time = time_us_32();
+        sonar->start_time = time;
         return;
       }
     }
@@ -145,6 +147,10 @@ void scan_sonars() {
     uint16_t distance = 0xFFFF;
     if (sonar->last_time_diff == (uint32_t)-1) {
       // No update
+      if (gpio_get(sonar->echo_pin) == 1) {
+        // echo pin high, still waiting for response
+        continue;
+      }
       distance = 0xFFFC; // error value
     } else if ((current_time - sonar->start_time) >
                1'000'000) // if too long since last trigger, send 0
