@@ -88,5 +88,5 @@ jobs:
                 Telemetrix4RpiPico.uf2
                 Telemetrix4RpiPico.elf
               generate_release_notes: false
-              tag_name: v0.2.0-rc.2_test
+              tag_name: ${{ github.ref_name }}
               token: ${{ secrets.RELEASE_TOKEN }} # needs contents permission on mirte-sd-image-tools 
