@@ -1174,7 +1174,7 @@ void readSensors() {
   for (auto &sensor : sensors) {
     sensor->readSensor();
   }
-  for (auto &module : modules) {
+  for (volatile auto &module : modules) {
     module->readModule();
   }
 }
@@ -1649,7 +1649,7 @@ int main() {
 void core1_main() {
   // slow tasks should be done on this core to speed up the main core
   auto last_scan = time_us_32();
-
+  int x = 0;
   while (true) {
     if (time_us_32() - last_scan >= scan_delay) {
       last_scan += scan_delay;
@@ -1658,7 +1658,13 @@ void core1_main() {
       // }
 
       // Add a memory barrier to signal to GCC that modules may change
-      asm volatile("" ::: "memory");
+      // somehow it otherwise doesnt work, even with volatile or atomic.
+
+      x++;
+      if (x % 200 == 0) {
+        // just to not trigger on every loop
+        asm volatile("" ::: "memory");
+      }
       for (volatile auto module : modules) {
         module->core1_update();
       }

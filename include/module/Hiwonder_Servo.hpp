@@ -1,9 +1,9 @@
 #pragma once
+#include "drivers/HiwonderServo.hpp"
+#include <atomic>
 #include <span>
 #include <stdlib.h>
 #include <vector>
-
-#include "drivers/HiwonderServo.hpp"
 
 #include "module.hpp"
 
@@ -11,17 +11,18 @@
 class HiwonderServoItem {
 public:
   HiwonderServo servo;
-  volatile bool updated_read = false;
-  volatile bool updated_write = false;
-  volatile int32_t lastreadPosition = 0;
-  volatile int32_t lastwritePosition = 0;
-  volatile int32_t write_time = 0;
-  bool disabled = false;
+  std::atomic<bool> updated_read = false;
+  std::atomic<bool> updated_write = false;
+  std::atomic<int32_t> lastreadPosition = 0;
+  std::atomic<int32_t> lastwritePosition = 0;
+  std::atomic<int32_t> write_time = 0;
+  std::atomic<bool> disabled = false;
   int fault_count = 0;
   mutex_t mutex; // for reading and writing updated and position
+  std::atomic<decltype(time_us_32())> last_force_write = 0;
 
   // Used for telemetrix to only publish on change:
-  int32_t lastPublishedPosition = 0;
+  std::atomic<int32_t> lastPublishedPosition = 0;
   HiwonderServoItem(HiwonderBus *bus, int id) : servo(bus, id) {}
 };
 
@@ -70,6 +71,5 @@ private:
   mutex_t bus_mutex;
   HiwonderBus *bus = nullptr;
   std::vector<HiwonderServoItem *> servos = {};
-  volatile int enabled_servos = 0;
-  decltype(time_us_32()) last_force_write = 0;
+  std::atomic<int> enabled_servos = 0;
 };
