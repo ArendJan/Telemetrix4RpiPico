@@ -27,13 +27,30 @@
  *https://github.com/raspberrypi/pico-examples/tree/master/gpio/dht_sensor
  *
  *************************************************************************/
+#include "module/Hiwonder_Servo.hpp"
+#include "module/PCA9685_Module.hpp"
+#include "module/tmx_ssd1306_Module.hpp"
+
+#include "drivers/neopixel.hpp"
+#include "sensors/adxl345_sensor.hpp"
+#include "sensors/as5600_sensor.hpp"
+#include "sensors/gps_sensor.hpp"
+#include "sensors/hmc5883l_sensor.hpp"
+#include "sensors/hx711_sensor.hpp"
+#include "sensors/ina226_sensor.hpp"
+#include "sensors/mpu9250_sensor.hpp"
+#include "sensors/veml6040_sensor.hpp"
+#include "sensors/vl53l0x_sensor.hpp"
 
 #include "Telemetrix4RpiPico.hpp"
-// #include "pico/stdio_uart.h"
-
+#include "sensors/sonar.hpp"
+#include "serialization.hpp"
+#include <functional>
 /*******************************************************************
  *              GLOBAL VARIABLES, AND STORAGE
  ******************************************************************/
+
+const auto ANALOG_OFFSET = 26;
 
 const uint LED_PIN = 25; // board LED
 
@@ -48,40 +65,38 @@ pin_descriptor the_digital_pins[MAX_DIGITAL_PINS_SUPPORTED];
 // an array of analog_pin_descriptors
 analog_pin_descriptor the_analog_pins[MAX_ANALOG_PINS_SUPPORTED];
 
-// number of active sonars
-int sonar_count = -1;
-uint sonar_offset;
-
-// sonar device descriptors
-sonar_data the_hc_sr04s = {.next_sonar_index = 0};
-
 // number of active dht devices
 int dht_count = -1;
 
 // dht device descriptors
-dht_data the_dhts = {.next_dht_index = 0};
+dht_data the_dhts = {.next_dht_index = 0, .dhts = {}};
 
-// pio for neopixel values
-PIO np_pio = pio0;
-uint np_sm = 0;
+// encoder device descriptors
+encoder_data encoders = {
+    .next_encoder_index = 0, .trigger_timer = {}, .encoders = {}, .mutex = {}};
 
-// neopixel storage for up to 150 pixel string
-// Each entry contains an RGG array.
+// // pio for neopixel values
+// PIO np_pio = pio0;
+// uint np_sm = 0;
 
-uint8_t pixel_buffer[MAXIMUM_NUM_NEOPIXELS][3];
+// // neopixel storage for up to 150 pixel string
+// // Each entry contains an RGG array.
 
-uint actual_number_of_pixels;
+// uint8_t pixel_buffer[MAXIMUM_NUM_NEOPIXELS][3];
+
+// uint actual_number_of_pixels;
 
 // scan delay
-uint8_t scan_delay = 100;
+uint32_t scan_delay = 100000;
 
-static inline void put_pixel(uint32_t pixel_grb) {
-  pio_sm_put_blocking(pio0, 0, pixel_grb << 8u);
-}
+// // TODO: remove this slow mess, use latest example with dma
+// static inline void put_pixel(uint32_t pixel_grb) {
+//   pio_sm_put_blocking(pio0, 0, pixel_grb << 8u);
+// }
 
-static inline uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b) {
-  return ((uint32_t)(r) << 8) | ((uint32_t)(g) << 16) | (uint32_t)(b);
-}
+// static inline uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b) {
+//   return ((uint32_t)(r) << 8) | ((uint32_t)(g) << 16) | (uint32_t)(b);
+// }
 
 // PWM values
 uint32_t top;
@@ -120,10 +135,6 @@ int digital_input_report_message[] = {3, DIGITAL_REPORT, 0, 0};
 // analog input report message
 int analog_input_report_message[] = {4, ANALOG_REPORT, 0, 0, 0};
 
-// sonar report message
-int sonar_report_message[] = {4, SONAR_DISTANCE, SONAR_TRIG_PIN, M_WHOLE_VALUE,
-                              CM_WHOLE_VALUE};
-
 // dht report message
 int dht_report_message[] = {
     6, DHT_REPORT, 0, 0, 0, 0, 0,
@@ -138,41 +149,21 @@ int dht_report_message[] = {
  The command_func is a pointer the command's function.
  ****************************************************************/
 // An array of pointers to the command functions
-command_descriptor command_table[] = {{&serial_loopback},
-                                      {&set_pin_mode},
-                                      {&digital_write},
-                                      {&pwm_write},
-                                      {&modify_reporting},
-                                      {&get_firmware_version},
-                                      {&get_pico_unique_id},
-                                      {&servo_attach},
-                                      {&servo_write},
-                                      {&servo_detach},
-                                      {&i2c_begin},
-                                      {&i2c_read},
-                                      {&i2c_write},
-                                      {&sonar_new},
-                                      {&dht_new},
-                                      {&stop_all_reports},
-                                      {&enable_all_reports},
-                                      {&reset_data},
-                                      {&reset_board},
-                                      {&init_neo_pixels},
-                                      {&show_neo_pixels},
-                                      {&set_neo_pixel},
-                                      {&clear_all_neo_pixels},
-                                      {&fill_neo_pixels},
-                                      {&init_spi},
-                                      {&write_blocking_spi},
-                                      {&read_blocking_spi},
-                                      {&set_format_spi},
-                                      {&spi_cs_control},
-                                      {&set_scan_delay},
-                                      {&encoder_new},
-                                      {&sensor_new},
-                                      {&ping},
-                                      {&module_new},
-                                      {&module_data}};
+template <typename V, typename... T>
+constexpr auto array_of(T &&...t) -> std::array<V, sizeof...(T)> {
+  return {{std::forward<T>(t)...}};
+}
+
+constexpr auto command_table = array_of<command_descriptor>(
+    &serial_loopback, &set_pin_mode, &digital_write, &pwm_write,
+    &modify_reporting, &get_firmware_version, &get_pico_unique_id,
+    &servo_attach, &servo_write, &servo_detach, &i2c_begin, &i2c_read,
+    &i2c_write, &sonar_new, &dht_new, &stop_all_reports, &enable_all_reports,
+    &reset_data, &reset_board, &init_neo_pixels, &show_neo_pixels,
+    &set_neo_pixel, &clear_all_neo_pixels, &fill_neo_pixels, &init_spi,
+    &write_blocking_spi, &read_blocking_spi, &set_format_spi, &spi_cs_control,
+    &set_scan_delay, &encoder_new, &sensor_new, &ping, &module_new,
+    &module_data, &get_id, &set_id, &feature_detect, &reset_to_bootloader);
 
 /***************************************************************************
  *                   DEBUGGING FUNCTIONS
@@ -194,9 +185,17 @@ void serial_loopback() {
  */
 // A method to send debug data across the serial link
 void send_debug_info(uint id, uint value) {
+  auto msg = std::span(debug_info_report_message);
   debug_info_report_message[DEBUG_ID] = id;
-  debug_info_report_message[DEBUG_VALUE_HIGH_BYTE] = (value & 0xff00) >> 8;
-  debug_info_report_message[DEBUG_VALUE_LOW_BYTE] = value & 0x00ff;
+  std::copy_n(encode_u16(value).cbegin(), sizeof(uint16_t),
+              msg.subspan<DEBUG_VALUE_HIGH_BYTE, sizeof(uint16_t)>().begin());
+
+  // Assert are OK; Removed for speed;
+  // assert(debug_info_report_message[DEBUG_VALUE_HIGH_BYTE] ==
+  //        (value & 0xFF00) >> 8);
+  // assert(debug_info_report_message[DEBUG_VALUE_LOW_BYTE] ==
+  //        (value & 0x00FF));
+
   serial_write((int *)debug_info_report_message,
                sizeof(debug_info_report_message) / sizeof(int));
 }
@@ -224,33 +223,33 @@ void led_debug(int blinks, uint delay) {
  */
 void set_pin_mode() {
   uint pin;
-  uint mode;
+  PIN_MODES mode;
   pin = command_buffer[SET_PIN_MODE_GPIO_PIN];
-  mode = command_buffer[SET_PIN_MODE_MODE_TYPE];
+  mode = (PIN_MODES)command_buffer[SET_PIN_MODE_MODE_TYPE];
 
   switch (mode) {
-  case DIGITAL_INPUT:
-  case DIGITAL_INPUT_PULL_UP:
-  case DIGITAL_INPUT_PULL_DOWN:
+  case PIN_MODES::INPUT:
+  case PIN_MODES::INPUT_PULL_UP:
+  case PIN_MODES::INPUT_PULL_DOWN:
     the_digital_pins[pin].pin_mode = mode;
     the_digital_pins[pin].reporting_enabled =
         command_buffer[SET_PIN_MODE_DIGITAL_IN_REPORTING_STATE];
     the_digital_pins[pin].last_value = 0xFF;
     gpio_init(pin);
     gpio_set_dir(pin, GPIO_IN);
-    if (mode == DIGITAL_INPUT_PULL_UP) {
+    if (mode == INPUT_PULL_UP) {
       gpio_pull_up(pin);
     }
-    if (mode == DIGITAL_INPUT_PULL_DOWN) {
+    if (mode == INPUT_PULL_DOWN) {
       gpio_pull_down(pin);
     }
     break;
-  case DIGITAL_OUTPUT:
+  case PIN_MODES::OUTPUT:
     the_digital_pins[pin].pin_mode = mode;
     gpio_init(pin);
     gpio_set_dir(pin, GPIO_OUT);
     break;
-  case PWM_OUTPUT: {
+  case PIN_MODES::PWM: {
     /* Here we will set the operating frequency to be 50 hz to
        simplify support PWM as well as servo support.
     */
@@ -263,31 +262,36 @@ void set_pin_mode() {
     // set frequency
     // determine top given Hz using the free-running clock
     uint32_t f_sys = clock_get_hz(clk_sys);
-    float divider = (float)(f_sys / 1000000UL); // run the pwm clock at 1MHz
+    float divider = (float)(f_sys / 1'000'000UL); // run the pwm clock at 1MHz
     pwm_set_clkdiv(slice_num,
-                   divider);    // pwm clock should now be running at 1MHz
-    top = 1000000UL / f_hz - 1; // calculate the TOP value
+                   divider); // pwm clock should now be running at 1MHz
+    const auto top_v = 1'000'000UL / f_hz - 1; // calculate the TOP value
+    top = top_v;
     pwm_set_wrap(slice_num, (uint16_t)top);
-
     // set the current level to 0
     pwm_set_gpio_level(pin, 0);
 
     pwm_set_enabled(slice_num, true); // let's go!
     gpio_set_function(pin, GPIO_FUNC_PWM);
+    static_assert(top_v == 19999, "Top is not 19999");
     break;
   }
-  case ANALOG_INPUT:
+  case PIN_MODES::ANALOG_INPUT: {
+    auto analog_pin = pin - ANALOG_OFFSET; // convert pin number to analog pin
     // if the temp sensor was selected, then turn it on
-    if (pin == ADC_TEMPERATURE_REGISTER) {
+    if (analog_pin == ADC_TEMPERATURE_REGISTER) {
       adc_set_temp_sensor_enabled(true);
     }
-    the_analog_pins[pin].reporting_enabled =
+    the_analog_pins[analog_pin].reporting_enabled =
         command_buffer[SET_PIN_MODE_ANALOG_IN_REPORTING_STATE];
     // save the differential value
-    the_analog_pins[pin].differential =
-        (int)((command_buffer[SET_PIN_MODE_ANALOG_DIFF_HIGH] << 8) +
-              command_buffer[SET_PIN_MODE_ANALOG_DIFF_LOW]);
-    break;
+    the_analog_pins[analog_pin].differential = std::max<int>(
+        1,
+        decode_u16(
+            std::span(command_buffer)
+                .subspan<SET_PIN_MODE_ANALOG_DIFF_HIGH, sizeof(uint16_t)>()));
+
+  } break;
   default:
     break;
   }
@@ -308,13 +312,14 @@ void digital_write() {
  * Set A PWM Pin's value
  */
 void pwm_write() {
+  auto data = std::span(command_buffer);
   uint pin;
   uint16_t value;
 
   pin = command_buffer[PWM_WRITE_GPIO_PIN];
 
-  value = (command_buffer[SET_PIN_MODE_PWM_HIGH_VALUE] << 8) +
-          command_buffer[SET_PIN_MODE_PWM_LOW_VALUE];
+  value =
+      decode_u16(data.subspan<SET_PIN_MODE_PWM_HIGH_VALUE, sizeof(uint16_t)>());
   pwm_set_gpio_level(pin, value);
 }
 
@@ -334,19 +339,19 @@ void modify_reporting() {
     }
     break;
   case REPORTING_ANALOG_ENABLE:
-    the_analog_pins[pin].reporting_enabled = true;
+    the_analog_pins[pin - ANALOG_OFFSET].reporting_enabled = true;
     break;
   case REPORTING_ANALOG_DISABLE:
-    the_analog_pins[pin].reporting_enabled = false;
+    the_analog_pins[pin - ANALOG_OFFSET].reporting_enabled = false;
     break;
   case REPORTING_DIGITAL_ENABLE:
-    if (the_digital_pins[pin].pin_mode != PIN_MODE_NOT_SET) {
-      the_digital_pins[pin].reporting_enabled = true;
+    if (the_digital_pins[pin - ANALOG_OFFSET].pin_mode != PIN_MODE_NOT_SET) {
+      the_digital_pins[pin - ANALOG_OFFSET].reporting_enabled = true;
     }
     break;
   case REPORTING_DIGITAL_DISABLE:
-    if (the_digital_pins[pin].pin_mode != PIN_MODE_NOT_SET) {
-      the_digital_pins[pin].reporting_enabled = false;
+    if (the_digital_pins[pin - ANALOG_OFFSET].pin_mode != PIN_MODE_NOT_SET) {
+      the_digital_pins[pin - ANALOG_OFFSET].reporting_enabled = false;
     }
     break;
   default:
@@ -377,8 +382,7 @@ void get_pico_unique_id() {
   unique_id_report_report_message[6] = (board_id.id[4]);
   unique_id_report_report_message[7] = (board_id.id[5]);
 
-  serial_write(unique_id_report_report_message,
-               sizeof(unique_id_report_report_message) / sizeof(int));
+  serial_write(unique_id_report_report_message, 10);
 }
 
 /********************************************
@@ -403,6 +407,7 @@ void enable_all_reports() {
  * Use the watchdog time to reset the board.
  */
 void reset_board() {
+  reset_hardware();
   watchdog_reboot(0, 0, 0);
   watchdog_enable(10, 1);
 }
@@ -411,17 +416,32 @@ void i2c_begin() {
   // get the GPIO pins associated with this i2c instance
   uint sda_gpio = command_buffer[I2C_SDA_GPIO_PIN];
   uint scl_gpio = command_buffer[I2C_SCL_GPIO_PIN];
-
-  // set the i2c instance - 0 or 1
-  if (command_buffer[I2C_PORT] == 0) {
-    i2c_init(i2c0, 100 * 1000);
-  } else {
-    i2c_init(i2c1, 100 * 1000);
+  uint8_t i2c_port = command_buffer[I2C_PORT];
+  if (i2c_port == sda_gpio && i2c_port == scl_gpio) {
+    // if the port is the same as the GPIO pins, then we are targeted as a raw
+    // device, so just use the default i2c pins
+    if (i2c_port == 0) {
+      sda_gpio = 4;
+      scl_gpio = 5;
+    } else if (i2c_port == 1) {
+      sda_gpio = 10;
+      scl_gpio = 11;
+    } else {
+      // invalid port, so return
+      return;
+    }
   }
-  gpio_set_function(sda_gpio, GPIO_FUNC_I2C);
-  gpio_set_function(scl_gpio, GPIO_FUNC_I2C);
-  gpio_pull_up(sda_gpio);
-  gpio_pull_up(scl_gpio);
+  reset_i2c(scl_gpio, sda_gpio, command_buffer[I2C_PORT]);
+  // // set the i2c instance - 0 or 1
+  // if (command_buffer[I2C_PORT] == 0) {
+  //   i2c_init(i2c0, 100 * 1000);
+  // } else {
+  //   i2c_init(i2c1, 100 * 1000);
+  // }
+  // gpio_set_function(sda_gpio, GPIO_FUNC_I2C);
+  // gpio_set_function(scl_gpio, GPIO_FUNC_I2C);
+  // gpio_pull_up(sda_gpio);
+  // gpio_pull_up(scl_gpio);
 }
 
 void i2c_read() {
@@ -443,8 +463,8 @@ void i2c_read() {
   // We have a separate buffer ot store the data read from the device
   // and combine that data back into the i2c report buffer.
   // This gets around casting.
-  uint8_t data_from_device[command_buffer[I2C_READ_LENGTH]];
-
+  // uint8_t data_from_device[command_buffer[I2C_READ_LENGTH]];
+  std::vector<uint8_t> data_from_device(command_buffer[I2C_READ_LENGTH], 0);
   uint8_t message_id = command_buffer[I2C_READ_MESSAGE_ID];
   // return value from write and read i2c sdk commands
   int i2c_sdk_call_return_value;
@@ -472,7 +492,7 @@ void i2c_read() {
 
   // now do the read request
   i2c_sdk_call_return_value = i2c_read_blocking(
-      i2c, (uint8_t)command_buffer[I2C_DEVICE_ADDRESS], data_from_device,
+      i2c, (uint8_t)command_buffer[I2C_DEVICE_ADDRESS], data_from_device.data(),
       (size_t)(command_buffer[I2C_READ_LENGTH]),
       (bool)command_buffer[I2C_READ_NO_STOP_FLAG]);
   if (i2c_sdk_call_return_value == PICO_ERROR_GENERIC) {
@@ -545,91 +565,52 @@ void i2c_write() {
 
   serial_write(i2c_report_message, I2C_ERROR_REPORT_NUM_OF_BYTE_TO_SEND);
 }
-
+TMX_NeoPixel np;
+bool np_initialized = false;
 void init_neo_pixels() {
-  // initialize the pico support a NeoPixel string
-  uint offset = pio_add_program(np_pio, &ws2812_program);
-  ws2812_init(np_pio, np_sm, offset, command_buffer[NP_PIN_NUMBER], 800000,
-              false);
-
-  actual_number_of_pixels = command_buffer[NP_NUMBER_OF_PIXELS];
-
-  // set the pixels to the fill color
-  for (uint i = 0; i < actual_number_of_pixels; i++) {
-    pixel_buffer[i][RED] = command_buffer[NP_RED_FILL];
-    pixel_buffer[i][GREEN] = command_buffer[NP_GREEN_FILL];
-    pixel_buffer[i][BLUE] = command_buffer[NP_BLUE_FILL];
-  }
-  show_neo_pixels();
-  sleep_ms(1);
+  np.init(command_buffer[NP_NUMBER_OF_PIXELS], command_buffer[NP_PIN_NUMBER],
+          command_buffer[NP_RED_FILL], command_buffer[NP_GREEN_FILL],
+          command_buffer[NP_BLUE_FILL]);
+  np_initialized = true;
 }
 
 void set_neo_pixel() {
-  // set a single neopixel in the pixel buffer
-  pixel_buffer[command_buffer[NP_PIXEL_NUMBER]][RED] =
-      command_buffer[NP_SET_RED];
-  pixel_buffer[command_buffer[NP_PIXEL_NUMBER]][GREEN] =
-      command_buffer[NP_SET_GREEN];
-  pixel_buffer[command_buffer[NP_PIXEL_NUMBER]][BLUE] =
-      command_buffer[NP_SET_BLUE];
-  if (command_buffer[NP_SET_AUTO_SHOW]) {
-    show_neo_pixels();
+  if (!np_initialized) {
+    return;
   }
+  np.setPixelColor(command_buffer[NP_PIXEL_NUMBER], command_buffer[NP_SET_RED],
+                   command_buffer[NP_SET_GREEN], command_buffer[NP_SET_BLUE],
+                   command_buffer[NP_SET_AUTO_SHOW]);
 }
 
 void show_neo_pixels() {
-  // show the neopixels in the buffer
-  for (int i = 0; i < actual_number_of_pixels; i++) {
-    put_pixel(urgb_u32(pixel_buffer[i][RED], pixel_buffer[i][GREEN],
-                       pixel_buffer[i][BLUE]));
+  if (!np_initialized) {
+    return;
   }
+  np.show();
 }
 
 void clear_all_neo_pixels() {
+  if (!np_initialized) {
+    return;
+  }
   // set all the neopixels in the buffer to all zeroes
-  for (int i = 0; i < actual_number_of_pixels; i++) {
-    pixel_buffer[i][RED] = 0;
-    pixel_buffer[i][GREEN] = 0;
-    pixel_buffer[i][BLUE] = 0;
-  }
-  if (command_buffer[NP_CLEAR_AUTO_SHOW]) {
-    show_neo_pixels();
-  }
+  np.clear();
 }
 
 void fill_neo_pixels() {
-  // fill all the neopixels in the buffer with the
-  // specified rgb values.
-  for (int i = 0; i < actual_number_of_pixels; i++) {
-    pixel_buffer[i][RED] = command_buffer[NP_FILL_RED];
-    pixel_buffer[i][GREEN] = command_buffer[NP_FILL_GREEN];
-    pixel_buffer[i][BLUE] = command_buffer[NP_FILL_BLUE];
+  if (!np_initialized) {
+    return;
   }
-  if (command_buffer[NP_FILL_AUTO_SHOW]) {
-    show_neo_pixels();
-  }
+  np.fill(command_buffer[NP_FILL_RED], command_buffer[NP_FILL_GREEN],
+          command_buffer[NP_FILL_BLUE], command_buffer[NP_FILL_AUTO_SHOW]);
 }
 
-void sonar_callback(uint gpio, uint32_t events) {
-  if (events & GPIO_IRQ_EDGE_FALL) {
-    // stop time
-    for (int i = 0; i <= sonar_count; i++) {
-      hc_sr04_descriptor *sonar = &the_hc_sr04s.sonars[i];
-      if (gpio == sonar->echo_pin) {
-        sonar->last_time_diff = time_us_32() - sonar->start_time;
-        return;
-      }
-    }
-  } else if (events & GPIO_IRQ_EDGE_RISE) {
-    // start time
-    for (int i = 0; i <= sonar_count; i++) {
-      hc_sr04_descriptor *sonar = &the_hc_sr04s.sonars[i];
-      if (gpio == sonar->echo_pin) {
-        sonar->start_time = time_us_32();
-        return;
-      }
-    }
+void reset_neo_pixels() {
+  if (!np_initialized) {
+    return;
   }
+  np.clear();
 }
 
 void init_quadrature_encoder(int A, int B, encoder_t *enc) {
@@ -652,9 +633,15 @@ void init_single_encoder(int A, encoder_t *enc) {
   enc->A = A;
   enc->type = SINGLE;
 }
+
 bool encoder_callback(repeating_timer_t *timer) {
   (void)timer;
+  if (!mutex_try_enter(&encoders.mutex, NULL)) {
+    return true;
+  }
+
   if (encoders.next_encoder_index == 0) {
+    mutex_exit(&encoders.mutex);
     return true;
   }
   for (int i = 0; i < encoders.next_encoder_index; i++) {
@@ -676,35 +663,45 @@ bool encoder_callback(repeating_timer_t *timer) {
     } else {
       bool a = gpio_get(enc->A);
       if (a != enc->last_state) {
-        enc->step++;
-        enc->last_state = a;
+        if (time_us_32() - enc->last_time > 1000) { // debounce time 1ms
+          enc->step++;
+          enc->last_time = time_us_32();
+          enc->last_state = a;
+        }
       }
     }
   }
+  mutex_exit(&encoders.mutex);
   return true;
 }
 
 bool create_encoder_timer() {
-  int hz = 2000;
+  int hz = 10'000;
   /* blue encoder motor:
   - 110 rpm = ~2 rot/s
   - 540 steps/rot
   - >1000 steps/s
   - requires at least 1 scan per step
+
+  Mirte-master:
+  107 rpm, 1320 ticks/rot
+  -> ~1.8 rot/s * 1320 = 2354 ticks/s
 */
-  if (!add_repeating_timer_us(-1000000 / hz, encoder_callback, NULL,
+  if (!add_repeating_timer_us(1'000'000 / hz, encoder_callback, NULL,
                               &encoders.trigger_timer)) {
-    printf("Failed to add timer\n");
+    // printf("Failed to add timer\n");
     return false;
   }
   return true;
 }
 
 void encoder_new() {
+
   ENCODER_TYPES type = (ENCODER_TYPES)command_buffer[ENCODER_TYPE];
   uint pin_a = command_buffer[ENCODER_PIN_A];
   uint pin_b = command_buffer[ENCODER_PIN_B]; // both cases will have a pin B
   if (encoders.next_encoder_index == 0) {
+    mutex_init(&encoders.mutex);
     bool timer = create_encoder_timer();
     if (!timer) {
       return;
@@ -712,6 +709,8 @@ void encoder_new() {
   } else if (encoders.next_encoder_index > MAX_ENCODERS) {
     return;
   }
+  mutex_enter_blocking(&encoders.mutex);
+
   encoder_t *new_encoder = &encoders.encoders[encoders.next_encoder_index];
   if (type == SINGLE) {
     init_single_encoder(pin_a, new_encoder);
@@ -719,10 +718,18 @@ void encoder_new() {
     init_quadrature_encoder(pin_a, pin_b, new_encoder);
   }
   encoders.next_encoder_index++;
+  mutex_exit(&encoders.mutex);
 }
+
 int encoder_report_message[] = {3, ENCODER_REPORT, 0, 0};
 
 void scan_encoders() {
+  if (encoders.next_encoder_index < 1) {
+    return;
+  }
+  if (!mutex_try_enter(&encoders.mutex, NULL)) {
+    return;
+  }
   for (int i = 0; i < encoders.next_encoder_index; i++) {
     encoder_t *enc = &encoders.encoders[i];
     if (enc->step != 0) {
@@ -732,47 +739,7 @@ void scan_encoders() {
       serial_write(encoder_report_message, 4);
     }
   }
-}
-
-bool sonar_timer_callback(
-    repeating_timer_t *rt) { // periodically trigger all sonars at the same time
-  gpio_set_mask(the_hc_sr04s.trigger_mask);
-  busy_wait_us(10);
-  gpio_clr_mask(the_hc_sr04s.trigger_mask);
-  return true;
-}
-
-void sonar_new() {
-  // add the sonar to the sonar struct to be processed within
-  // the main loop
-  uint trig_pin = command_buffer[SONAR_TRIGGER_PIN];
-  uint echo_pin = command_buffer[SONAR_ECHO_PIN];
-
-  // for the first HC-SR04, add the program.
-  if (sonar_count == -1) {
-    // Init timer
-    int hz = 10;
-    // negative timeout means exact delay (rather than delay between callbacks)
-    if (!add_repeating_timer_us(-1000000 / hz, sonar_timer_callback, NULL,
-                                &the_hc_sr04s.trigger_timer)) {
-      printf("Failed to add timer\n");
-      return;
-    }
-  }
-  sonar_count++;
-  if (sonar_count > MAX_SONARS) {
-    return;
-  }
-  the_hc_sr04s.sonars[sonar_count].trig_pin = trig_pin;
-  the_hc_sr04s.sonars[sonar_count].echo_pin = echo_pin;
-  the_hc_sr04s.sonars[sonar_count].last_time_diff = 0;
-  the_hc_sr04s.trigger_mask |= 1ul << trig_pin;
-  gpio_init(trig_pin);
-  gpio_set_dir(trig_pin, GPIO_OUT);
-  gpio_init(echo_pin);
-  gpio_set_dir(echo_pin, GPIO_IN);
-  gpio_set_irq_enabled_with_callback(
-      echo_pin, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &sonar_callback);
+  mutex_exit(&encoders.mutex);
 }
 
 bool repeating_timer_callback(struct repeating_timer *t) {
@@ -810,10 +777,8 @@ void init_spi() {
     spi_port = spi1;
   }
 
-  spi_baud_rate =
-      ((command_buffer[SPI_FREQ_MSB] << 24) +
-       (command_buffer[SPI_FREQ_3] << 16) + (command_buffer[SPI_FREQ_2] << 8) +
-       (command_buffer[SPI_FREQ_1]));
+  spi_baud_rate = decode_u32(
+      std::span(command_buffer).subspan<SPI_FREQ_MSB, sizeof(uint32_t)>());
 
   spi_init(spi_port, spi_baud_rate);
 
@@ -843,7 +808,9 @@ void spi_cs_control() {
   asm volatile("nop \n nop \n nop");
 }
 
-void set_scan_delay() { scan_delay = command_buffer[SCAN_DELAY]; }
+void set_scan_delay() {
+  scan_delay = ((uint32_t)command_buffer[SCAN_DELAY]) * 1000;
+}
 
 void read_blocking_spi() {
   // The report_message offsets:
@@ -856,7 +823,10 @@ void read_blocking_spi() {
   spi_inst_t *spi_port;
   size_t data_length;
   uint8_t repeated_transmit_byte;
-  uint8_t data[command_buffer[SPI_READ_LEN]];
+  std::vector<uint8_t> data;
+  data.resize(command_buffer[SPI_READ_LEN]);
+  std::fill(data.begin(), data.end(), 0);
+  // uint8_t data[command_buffer[SPI_READ_LEN]];
 
   if (command_buffer[SPI_PORT] == 0) {
     spi_port = spi0;
@@ -866,12 +836,12 @@ void read_blocking_spi() {
 
   data_length = command_buffer[SPI_READ_LEN];
   // memset(data, 0, data_length);
-  memset(data, 0, sizeof(data));
+  // memset(data, 0, sizeof(data));
 
   repeated_transmit_byte = command_buffer[SPI_REPEATED_DATA];
 
   // read data
-  spi_read_blocking(spi_port, repeated_transmit_byte, data, data_length);
+  spi_read_blocking(spi_port, repeated_transmit_byte, data.data(), data_length);
   sleep_ms(100);
 
   // build a report from the data returned
@@ -880,7 +850,7 @@ void read_blocking_spi() {
   spi_report_message[SPI_REPORT_ID] = SPI_REPORT;
   spi_report_message[SPI_REPORT_PORT] = command_buffer[SPI_PORT];
   spi_report_message[SPI_REPORT_NUMBER_OF_DATA_BYTES] = data_length;
-  for (int i = 0; i < data_length; i++) {
+  for (size_t i = 0; i < data_length; i++) {
     spi_report_message[SPI_DATA + i] = data[i];
   }
   serial_write((int *)spi_report_message, SPI_DATA + data_length);
@@ -888,7 +858,7 @@ void read_blocking_spi() {
 
 void write_blocking_spi() {
   spi_inst_t *spi_port;
-  uint cs_pin;
+  // uint cs_pin;
   size_t data_length;
 
   if (command_buffer[SPI_PORT] == 0) {
@@ -921,11 +891,32 @@ void set_format_spi() {
 void reset_data() {}
 
 /***************** Currently Unused ***************************/
-void servo_attach() {}
+void servo_attach() {
 
-void servo_write() {}
+  auto pin = command_buffer[1];
+  // auto min_pulse = command_buffer[
+  command_buffer[SET_PIN_MODE_GPIO_PIN] = pin;
+  command_buffer[SET_PIN_MODE_MODE_TYPE] = PIN_MODES::PWM;
+  set_pin_mode();
+}
 
-void servo_detach() {}
+void servo_write() {
+  // get microticks value
+  const uint32_t f_hz = 50; // frequency in hz.
+
+  auto pin = command_buffer[1];
+  uint16_t ticks_ms =
+      decode_u16(std::span(command_buffer).subspan<2, sizeof(uint16_t)>());
+
+  const uint32_t top = 1'000'000UL / f_hz - 1; // calculate the TOP value
+
+  uint16_t value = (ticks_ms * top) / 20'000UL;
+  pwm_set_gpio_level(pin, value);
+}
+
+void servo_detach() {
+  // TODO: implement
+}
 
 /******************************************************
  *             INTERNALLY USED FUNCTIONS
@@ -950,6 +941,7 @@ void get_next_command() {
     // no data, let the main loop continue to run to handle inputs
     return;
   } else {
+    gpio_put(LED_PIN, !gpio_get(LED_PIN)); // toggle the led state
     // get the rest of the packet
     for (int i = 0; i < packet_size; i++) {
       for (int retries = 10; retries > 0; retries--) {
@@ -995,9 +987,9 @@ void scan_digital_inputs() {
   // index 3 = value
 
   for (int i = 0; i < MAX_DIGITAL_PINS_SUPPORTED; i++) {
-    if (the_digital_pins[i].pin_mode == DIGITAL_INPUT ||
-        the_digital_pins[i].pin_mode == DIGITAL_INPUT_PULL_UP ||
-        the_digital_pins[i].pin_mode == DIGITAL_INPUT_PULL_DOWN) {
+    if (the_digital_pins[i].pin_mode == PIN_MODES::INPUT ||
+        the_digital_pins[i].pin_mode == PIN_MODES::INPUT_PULL_UP ||
+        the_digital_pins[i].pin_mode == PIN_MODES::INPUT_PULL_DOWN) {
       if (the_digital_pins[i].reporting_enabled) {
         // if the value changed since last read
         value = gpio_get(the_digital_pins[i].pin_number);
@@ -1026,49 +1018,36 @@ void scan_analog_inputs() {
   int differential;
 
   for (uint8_t i = 0; i < MAX_ANALOG_PINS_SUPPORTED; i++) {
-    if (the_analog_pins[i].reporting_enabled) {
+    if (the_analog_pins[i].reporting_enabled) { // TODO: move numbering to pin
+                                                // number for reporting
       adc_select_input(i);
       value = adc_read();
       differential = abs(value - the_analog_pins[i].last_value);
       if (differential >= the_analog_pins[i].differential) {
+        auto msg_span = std::span(analog_input_report_message);
         // trigger value achieved, send out the report
         the_analog_pins[i].last_value = value;
-        // input_message[1] = the_analog_pins[i].pin_number;
-        analog_input_report_message[ANALOG_INPUT_GPIO_PIN] = (uint8_t)i;
-        analog_input_report_message[ANALOG_VALUE_HIGH_BYTE] = value >> 8;
-        analog_input_report_message[ANALOG_VALUE_LOW_BYTE] = value & 0x00ff;
+        analog_input_report_message[ANALOG_INPUT_GPIO_PIN] =
+            (uint8_t)i + ANALOG_OFFSET;
+        std::copy_n(encode_u16(value).cbegin(), sizeof(uint16_t),
+                    msg_span.subspan<ANALOG_VALUE_HIGH_BYTE, sizeof(uint16_t)>()
+                        .begin());
+
+        // Asserts check out; Removed for performance
+        // assert(analog_input_report_message[ANALOG_VALUE_HIGH_BYTE] == (value
+        // &
+        //        0xFF00) >> 8);
+        // assert(analog_input_report_message[ANALOG_VALUE_LOW_BYTE] == value &
+        //        0x00FF);
         serial_write(analog_input_report_message, 5);
       }
     }
   }
 }
 
-void scan_sonars() {
-  uint32_t current_time = time_us_32();
-  for (int i = 0; i <= sonar_count; i++) {
-    hc_sr04_descriptor *sonar = &the_hc_sr04s.sonars[i];
-
-    if ((current_time - sonar->start_time) >
-        1000000) // if too long since last trigger, send 0
-    {
-      sonar->last_time_diff = 0;
-    }
-    if (sonar->last_time_diff > 30000) {
-      sonar->last_time_diff = 0; // HC-SR04 has max range of 4 / 5m, with a
-                                 // timeout pulse longer than 35ms
-    }
-    // 0.1mm increments
-    int distance = (sonar->last_time_diff) / (58.0 / 100);
-
-    sonar_report_message[SONAR_TRIG_PIN] = (uint8_t)sonar->trig_pin;
-    sonar_report_message[M_WHOLE_VALUE] = distance / 10000;
-    sonar_report_message[CM_WHOLE_VALUE] = (distance / 100) % 100;
-    serial_write(sonar_report_message, 5);
-  }
-}
-
+bool watchdog_enabled = false;
+uint32_t last_ping = 0;
 void ping() {
-  static bool watchdog_enabled = false;
   static uint8_t random = -1;
 
   auto special_num = command_buffer[1];
@@ -1085,116 +1064,254 @@ void ping() {
                               special_num, random};
   out[0] = out.size() - 1; // dont count the packet length
   serial_write(out);
-
-  watchdog_update();
+  if (watchdog_enable_shutdown) {
+    watchdog_update();
+    last_ping = time_us_32();
+  }
 }
 
+const auto wd_timeout_time = WATCHDOG_TIME * 4000 / 5;
+
+bool timeout_safe() { return time_us_32() - last_ping < wd_timeout_time / 2; }
+
+void check_wd_timeout() {
+  // if watchdog is about to run out of time, reset modules
+  if (time_us_32() - last_ping >= (wd_timeout_time)) {
+    reset_hardware();
+  }
+}
+
+void reset_hardware() {
+  for (auto &sensor : sensors) {
+    sensor->resetSensor();
+  }
+  for (auto &module : modules) {
+    module->resetModule();
+  }
+  reset_neo_pixels();
+}
 // SENSORSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
 
+auto sensor_funcs = std::vector<std::pair<
+    SENSOR_TYPES, std::function<Sensor *(uint8_t[SENSORS_MAX_SETTINGS_A])>>>{
+    {SENSOR_TYPES::VEML6040,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new VEML6040_Sensor(data);
+     }},
+    {SENSOR_TYPES::TOF_VL53,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new VL53L0X_Sensor(data);
+     }},
+    {SENSOR_TYPES::MPU_9250,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new MPU9250_Sensor(data);
+     }},
+    {SENSOR_TYPES::LOAD_CELL,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new HX711_Sensor(data);
+     }},
+    {SENSOR_TYPES::INA226a,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new INA226_Sensor(data);
+     }},
+    {SENSOR_TYPES::HMC5883l,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new HMC5883L_Sensor(data);
+     }},
+    {SENSOR_TYPES::AS5600_t,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new AS5600_Sensor(data);
+     }},
+};
+
 void sensor_new() {
-  const SENSOR_TYPES type = (SENSOR_TYPES)command_buffer[2];
-  const uint8_t sensor_num = command_buffer[1];
-  uint8_t sensor_data[SENSORS_MAX_SETTINGS_A];
-  std::copy(command_buffer + 3, command_buffer + 3 + SENSORS_MAX_SETTINGS_A,
-            sensor_data);
-  if (type >= SENSOR_TYPES::MAX_SENSORS) {
-    return;
-  }
-  Sensor *sensor = nullptr;
-  if (type == SENSOR_TYPES::VEML6040) {
-    sensor = new VEML6040_Sensor(sensor_data);
-  } else {
-    return;
-  }
 
-  sensor->type = type;
-  sensor->num = sensor_num;
+  const uint8_t sensor_cmd = command_buffer[1];
+  if (sensor_cmd == 0) { // feature detection
+    const SENSOR_TYPES type = (SENSOR_TYPES)command_buffer[2];
+    bool found = false;
+    for (const auto &sensor_f : sensor_funcs) {
+      if (sensor_f.first == type) {
+        found = true;
+        break;
+      }
+    }
+    serial_write({0, // packet length
+                  SENSOR_MAIN_REPORT,
+                  0, // feature check
+                  (uint8_t)type, (uint8_t)(found ? 1u : 0u)});
 
-  sensors.push_back(sensor);
+  } else if (sensor_cmd == 1) {
+
+    const SENSOR_TYPES type = (SENSOR_TYPES)command_buffer[3];
+    const uint8_t sensor_num = command_buffer[2];
+
+    uint8_t sensor_data[SENSORS_MAX_SETTINGS_A];
+    std::copy(command_buffer + 4, command_buffer + 4 + SENSORS_MAX_SETTINGS_A,
+              sensor_data);
+    if (type >= SENSOR_TYPES::MAX_SENSORS) {
+      return;
+    }
+    Sensor *sensor = nullptr;
+    for (auto sensor_f : sensor_funcs) {
+      if (sensor_f.first == type) {
+        sensor = sensor_f.second(sensor_data);
+        break;
+      }
+    }
+    if (sensor == nullptr) {
+      return; // sensor not found
+    }
+
+    sensor->type = type;
+    sensor->num = sensor_num;
+
+    sensors.push_back(sensor);
+  }
 }
 
 void readSensors() {
   for (auto &sensor : sensors) {
     sensor->readSensor();
   }
-  return;
-  // for (auto &module : modules) {
-  //   module->readModule();
-  // }
-}
-
-VEML6040_Sensor::VEML6040_Sensor(uint8_t settings[SENSORS_MAX_SETTINGS_A]) {
-  this->i2c_port = settings[0];
-  this->init_sequence();
-}
-
-void VEML6040_Sensor::init_sequence() {
-  bool ok = write_i2c(this->i2c_port, this->i2c_addr,
-                      {
-                          0,             // register 0
-                          0b000 << 4 |   // timing 40ms
-                              0b0 << 2 | // no trigger
-                              0b0 << 1 | // auto mode
-                              0b0,       // enable sensor
-                          0b0            // reserved H byte
-                      });
-  if (!ok) {
-    this->stop = true;
+  for (volatile auto &module : modules) {
+    module->readModule();
   }
 }
 
-void VEML6040_Sensor::readSensor() {
-  if (this->stop) {
+/***********************************************/
+/***************MODULES*************************/
+void module_new() {
+  const auto msg_type = command_buffer[1];
+  const std::vector<
+      std::pair<MODULE_TYPES, std::function<Module *(std::vector<uint8_t> &)>>>
+      module_funcs = {
+          {MODULE_TYPES::PCA9685,
+           [](std::vector<uint8_t> &data) { return new PCA9685_Module(data); }},
+          {MODULE_TYPES::HIWONDER_SERVO,
+           [](std::vector<uint8_t> &data) { return new Hiwonder_Servo(data); }},
+          // {MODULE_TYPES::SHUTDOWN_RELAY, [](const std::vector<uint8_t>& data)
+          // { return nullptr; /* not implemented */ }},
+          {MODULE_TYPES::TMX_SSD1306,
+           [](std::vector<uint8_t> &data) { return new TmxSSD1306(data); }},
+      };
+
+  if (msg_type == 1) {
+    const MODULE_TYPES type = (MODULE_TYPES)command_buffer[3];
+    const uint8_t module_num = command_buffer[2];
+    std::vector<uint8_t> data;
+    data.insert(data.end(), &command_buffer[4], &command_buffer[packet_size]);
+
+    if (type >= MODULE_TYPES::MAX_MODULES) {
+      return;
+    }
+    Module *module = nullptr;
+    // if (type == MODULE_TYPES::PCA9685) {
+    //   module = new PCA9685_Module(data);
+    // } else if (type == MODULE_TYPES::HIWONDER_SERVO) {
+    //   module = new Hiwonder_Servo(data);
+    // } else if (type == MODULE_TYPES::SHUTDOWN_RELAY) {
+    //   return; // not implemented
+    //   // module = new Shutdown_Relay(data);
+    // } else if (type == MODULE_TYPES::TMX_SSD1306) {
+    //   module = new TmxSSD1306(data);
+    // } else {
+    //   return;
+    // }
+    for (const auto &[module_type, func] : module_funcs) {
+      if (module_type == type) {
+        module = func(data);
+        break;
+      }
+    }
+    if (module == nullptr) {
+      return; // module not found
+    }
+    module->type = type;
+    module->num = module_num;
+
+    modules.push_back(module);
+  } else if (msg_type == 0) { // check module type feature detection
+    bool found = false;
+    const uint8_t module_type_target = command_buffer[2];
+    for (const auto &[module_type, func] : module_funcs) {
+      if (module_type == module_type_target && func != nullptr) {
+        found = true;
+        break;
+      }
+    }
+    serial_write({0, // packet length
+                  MODULE_MAIN_REPORT,
+                  0, // feature check
+                  module_type_target, (uint8_t)(found ? 1u : 0u)});
+  }
+}
+
+void module_data() {
+  const uint8_t module_num = command_buffer[1];
+  if (module_num > modules.size()) {
     return;
   }
   std::vector<uint8_t> data;
-  data.reserve(8);
-  std::vector<uint8_t> single_color_data(2);
-  bool ok = true;
-  for (uint8_t reg = 0x08; reg <= 0x0B;
-       reg++) { // read the 4 registers and add the data to the full data vector
-    ok &= read_i2c(this->i2c_port, this->i2c_addr, {reg}, 2, single_color_data);
-    data.push_back(single_color_data[0]);
-    data.push_back(single_color_data[1]);
-  }
-
-  this->writeSensorData(data);
-  if (!ok) {
-    this->stop = true;
-  }
+  data.insert(data.end(), &command_buffer[2], &command_buffer[packet_size]);
+  modules[module_num]->writeModule(data);
 }
 
-void Sensor::writeSensorData(std::vector<uint8_t> data) {
-  std::vector<uint8_t> out = {
-      0,                  // write len
-      SENSOR_REPORT,      // write type
-      (uint8_t)this->num, // write num
-      this->type,         // write sensor type
-  };
-  out.insert(out.end(), data.begin(), data.end());
-  out[0] = out.size() - 1; // dont count the packet length
+// Shutdown_Relay::Shutdown_Relay(std::vector<uint8_t> &data) {
+//   this->pin = data[0];
+//   this->enable_on = data[1];
+//   this->wait_time = data[2]; // seconds
+//   gpio_init(this->pin);
+//   gpio_set_dir(this->pin, GPIO_OUT);
+//   gpio_put(this->pin, !this->enable_on);
+//   this->start_time = time_us_32();
+//   this->enabled = false;
+// }
 
-  serial_write(out);
+bool watchdog_enable_shutdown = true; // if false, then don't do anything with
+                                      // the watchdog and just wait for shutdown
+
+void disable_watchdog() {
+  hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
 }
 
-void serial_write(std::vector<uint8_t> data) {
-  for (auto i : data) {
-    put_byte(i);
-  }
-  stdio_flush();
+void enable_watchdog() {
+  watchdog_enable(WATCHDOG_TIME,
+                  1); // Add watchdog again requiring trigger every 5s
+  watchdog_update();
 }
 
-void put_byte(uint8_t byte) {
-  // if (uart_enabled) {
-  //   uart_putc(UART_ID, byte);
-  // }
-  putchar(byte);
-}
-/***********************************************/
-/***************MODULES*************************/
-void module_new() { return; }
+// void Shutdown_Relay::readModule() {
+//   if (this->enabled) {
+//     if (time_us_32() - this->start_time > (this->wait_time * 1'000'000)) {
+//       gpio_put(this->pin, this->enable_on);
+//       // relay will be turned off and power will be cut
 
-void module_data() { return; }
+//       // enable watchdog and wait for reset when the relay is not connected
+//       or
+//       // not working. Don't want the pico to be stuck
+//       enable_watchdog();
+//       while (true) {
+//         led_debug(100, 100);
+//       }
+//     }
+//   }
+// }
+
+// void Shutdown_Relay::writeModule(std::vector<uint8_t> &data) {
+//   if (data[0] == 1) // trigger to start the countdown
+//   {
+//     this->start_time = time_us_32();
+//     this->enabled = true;
+//     disable_watchdog();
+//     watchdog_enable_shutdown = false; // dont let ping pet the watchdog
+//   } else {
+//     this->enabled = false;
+//     enable_watchdog();
+//     watchdog_enable_shutdown = true;
+//   }
+//   gpio_put(LED_PIN, this->enabled);
+// }
 
 /**********************ORIGINAL MODULES******************************/
 
@@ -1215,6 +1332,7 @@ void scan_dhts() {
   }
 }
 
+// TODO: Make use of encode/decode msgs
 void read_dht(uint dht_pin) {
   int data[5] = {0, 0, 0, 0, 0};
   uint last = 1;
@@ -1238,17 +1356,20 @@ void read_dht(uint dht_pin) {
     while (gpio_get(dht_pin) == last) {
       count++;
       sleep_us(1);
-      if (count == 255)
+      if (count == 255) {
         break;
+      }
     }
     last = gpio_get(dht_pin);
-    if (count == 255)
+    if (count == 255) {
       break;
+    }
 
     if ((i >= 4) && (i % 2 == 0)) {
       data[j / 8] <<= 1;
-      if (count > 46)
+      if (count > 46) {
         data[j / 8] |= 1;
+      }
       j++;
     }
   }
@@ -1286,74 +1407,180 @@ void read_dht(uint dht_pin) {
   serial_write(dht_report_message, 7);
 }
 
-/*************************************************
- * Write data to serial interface
- * @param buffer
- * @param num_of_bytes_to_send
- */
-void serial_write(const int *buffer, int num_of_bytes_to_send) {
-  for (int i = 0; i < num_of_bytes_to_send; i++) {
-    put_byte((buffer[i]) & 0x00ff);
+#define ENTRY_MAGIC 0xb105f00d
+void reset_to_bootloader() {
+  hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
+  watchdog_hw->scratch[5] = ENTRY_MAGIC;
+  watchdog_hw->scratch[6] = ~ENTRY_MAGIC;
+  led_debug(10, 100);
+  watchdog_reboot(0, 0, 0);
+
+  while (1) {
+    tight_loop_contents();
   }
-  stdio_flush();
 }
 
-bool uart_enabled = true;
+#include "hardware/flash.h"
 
-void check_uart_loopback() {
-  return; // V0.1.1: not for mirte-master
-  // uart_init(UART_ID, BAUD_RATE);
-  // gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
-  // gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
-  // uart_putc_raw(UART_ID, 'A');
+#define FLASH_TARGET_OFFSET (256 * 1024)
 
-  // // If we read back the same message as sent, then there is a loopback
-  // // and disable the uart for normal Telemetrix communication.
-  // while (uart_is_readable(UART_ID)) {
-  //   uint8_t ch = uart_getc(UART_ID);
-  //   // empty the uart.
-  // }
-  // uint8_t test_message = 'A';
-  // uint8_t read_byte;
+const uint8_t *flash_target_contents =
+    (const uint8_t *)(XIP_BASE + FLASH_TARGET_OFFSET);
 
-  // uart_putc_raw(UART_ID, test_message);
-  // sleep_ms(10);
-  // if (uart_is_readable(UART_ID)) {
-  //   read_byte = uart_getc(UART_ID);
-  //   if (read_byte == test_message) {
-  //     uart_enabled = false;
-  //     return;
-  //   }
-  // }
+void get_id() {
+  int id[] = {2, GET_ID, 0};
+  id[2] = (uint8_t)(flash_target_contents[0]); // get the id from the flash,
+                                               // just the first byte
+  serial_write(id, 3);
 }
 
-int get_byte() {
-  // If there is no uart loopback, then also check the uart for incoming data.
-  // if (uart_enabled) {
-  //   if (uart_is_readable(UART_ID)) {
-  //     return uart_getc(UART_ID);
-  //   }
-  // }
-  return getchar_timeout_us(100);
+void set_id() {
+  // msg format: 2, SET_ID, new_id
+  uint8_t new_id = command_buffer[1];
+  int id_msg[] = {2, SET_ID, new_id};
+  if (new_id ==
+      flash_target_contents[0]) { // no need to write anything to flash
+    serial_write(id_msg, 3);
+
+    return;
+  }
+  uint8_t new_id_array[FLASH_PAGE_SIZE] = {0};
+  new_id_array[0] = new_id;
+  uint32_t ints = save_and_disable_interrupts();
+
+  static_assert(FLASH_PAGE_SIZE == 256);
+
+  flash_range_erase(FLASH_TARGET_OFFSET,
+                    FLASH_SECTOR_SIZE); // required to erase before writing
+
+  flash_range_program(FLASH_TARGET_OFFSET, new_id_array, FLASH_PAGE_SIZE);
+  restore_interrupts(ints);
+
+  serial_write(id_msg, 3);
 }
+
+void feature_detect() {
+  // msg format: 2, FEATURE_DETECT, feature_id
+  uint8_t feature_id = command_buffer[1];
+  std::vector<uint8_t> id_msg = {4, FEATURE_CHECK, feature_id, 0};
+  if (feature_id >= command_table.size()) {
+    id_msg[3] = 0;
+    // id_msg[0]=2;
+    serial_write(id_msg);
+    return;
+  }
+  if (command_table[feature_id].command_func == nullptr) {
+
+    id_msg[3] = 0;
+  } else {
+    id_msg[3] = 1;
+  }
+  // TODO: add more features for specific types:
+  switch (feature_id) {
+  case SONAR_NEW:
+    id_msg.push_back(MAX_SONARS);
+    break;
+  case ENCODER_NEW:
+    id_msg.push_back(MAX_ENCODERS);
+    id_msg.push_back(2); // allow quad enc
+    break;
+  case SET_PIN_MODE:
+    id_msg.push_back(MAX_DIGITAL_PINS_SUPPORTED);
+    id_msg.push_back(12); // adc resolution is 12 bit
+    id_msg.push_back(14); // pwm resolution is 14 bit kinda
+    id_msg.push_back(MAX_ANALOG_PINS_SUPPORTED);
+    for (int i = 0; i < MAX_ANALOG_PINS_SUPPORTED; i++) {
+      id_msg.push_back(i + ANALOG_OFFSET);
+    }
+    break;
+  case SERVO_ATTACH:
+    id_msg.push_back(12);
+    break;
+  case GET_FIRMWARE_VERSION:
+    id_msg.push_back(FIRMWARE_MAJOR);
+    id_msg.push_back(FIRMWARE_MINOR);
+    break;
+  case GET_PICO_UNIQUE_ID:
+    break;
+  case I2C_BEGIN:
+    id_msg.push_back(2); // 2 i2c ports
+    break;
+  default:
+    break;
+  }
+  serial_write(id_msg);
+}
+
+bool check_usb_connection() {
+  // Read in VBUS pin
+  // NOTE: this does not work with a pico W, as the VBUS pin is connected to the
+  // Wifi chip
+  auto const USB_VBUS_PIN = 24;
+  return gpio_get(USB_VBUS_PIN);
+}
+#define MIRTE_MASTER 1
+#if MIRTE_MASTER
+#define DISABLE_USB_CHECK 1
+void check_mirte_master() {
+#if DISABLE_USB_CHECK
+  return;
+#endif
+  if (uart_enabled) {
+    // Not a mirte master pcb (with tied uart pins)
+    return;
+  }
+  auto usb = check_usb_connection();
+  // gpio_put(LED_PIN, usb);
+  // Assume the pico is put on a mirte-master pcb
+  // when the pc is shut down, but did not inform the pico for the relay, then
+  // the power will stay on check usb connection, if not connected, then turn
+  // off the relay
+  static auto start_time = 0;
+  if (!usb) {
+    if (start_time == 0) {
+      start_time = time_us_32();
+    }
+    if (time_us_32() - start_time >
+        100'000'000) { // Wait 100s for a usb connection
+      const auto relay_pin = 27;
+      gpio_init(relay_pin);
+      gpio_set_dir(relay_pin, GPIO_OUT);
+      gpio_put(relay_pin, 1);
+      enable_watchdog();
+      while (1) {
+        led_debug(10, 200);
+      }
+    }
+  } else {
+    start_time = 0;
+  }
+}
+#endif
+
+std::vector<Sensor *> sensors;
+std::vector<Module *> modules;
 
 /***************************************************************
  *                  MAIN FUNCTION
  ****************************************************************/
-
+void core1_main();
 int main() {
   // gpio_init(14);
   // gpio_set_dir(14, GPIO_OUT);
-
   // gpio_put(14, 0);
-  stdio_init_all();
+  gpio_init(LED_PIN);
+  gpio_set_dir(LED_PIN, GPIO_OUT);
+
+  // stdio_init_all();
+  stdio_usb_init();
   stdio_set_translate_crlf(&stdio_usb, false);
   // #ifdef WITH_UART_STDIO
-  stdio_set_translate_crlf(&stdio_uart, false);
+  // stdio_set_translate_crlf(&stdio_uart, false);
   // #endif
   stdio_flush();
-  // check_uart_loopback(); // Mirte-master has pin 0 and 1 tied together, then
+  check_uart_loopback(); // Mirte-master has pin 0 and 1 tied together, then
   //                        // don't want to use it
+  led_debug(5, 100);
   adc_init();
   // create an array of pin_descriptors for 100 pins
   // establish the digital pin array
@@ -1371,38 +1598,88 @@ int main() {
   }
 
   // initialize the sonar structures
-  sonar_data the_hc_sr04s = {.next_sonar_index = 0, .trigger_mask = 0};
+  // sonar_data the_hc_sr04s = ;
   for (int i = 0; i < MAX_SONARS; i++) {
     the_hc_sr04s.sonars[i].trig_pin = the_hc_sr04s.sonars[i].echo_pin =
         (uint)-1;
   }
 
-  gpio_init(LED_PIN);
-  gpio_set_dir(LED_PIN, GPIO_OUT);
-
   // blink the board LED twice to show that the board is
   // starting afresh
   led_debug(2, 250);
+  gpio_put(LED_PIN, uart_enabled);
+
   // watchdog_enable(WATCHDOG_TIME, 1); // Add watchdog requiring trigger every
   // 5s
 
   // infinite loop
-  uint32_t start = time_us_32();
   uint32_t last_scan = 0;
+
+  // start second core
+  multicore_launch_core1(core1_main);
+
   while (true) {
     // watchdog_update();
     get_next_command();
 
     if (!stop_reports) {
-      if (time_us_32() - last_scan >= (scan_delay * 1000)) {
-        last_scan = time_us_32();
+      if (time_us_32() - last_scan >= (scan_delay)) {
+        last_scan += scan_delay;
         scan_digital_inputs();
         scan_analog_inputs();
         scan_sonars();
         scan_dhts();
         scan_encoders();
         readSensors();
+#if MIRTE_MASTER
+        check_mirte_master(); // Not needed anymore, as relay and transistors
+                              // are broken
+#endif
+        if (watchdog_enabled) {
+          check_wd_timeout();
+        }
+      }
+      for (auto module : modules) {
+        module->updModule();
       }
     }
   }
 }
+
+void core1_main() {
+  // slow tasks should be done on this core to speed up the main core
+  auto last_scan = time_us_32();
+  int x = 0;
+  while (true) {
+    if (time_us_32() - last_scan >= scan_delay) {
+      last_scan += scan_delay;
+      // for(auto sensor : sensors) {
+      //   sensor->core1_update();
+      // }
+
+      // Add a memory barrier to signal to GCC that modules may change
+      // somehow it otherwise doesnt work, even with volatile or atomic.
+
+      x++;
+      if (x % 200 == 0) {
+        // just to not trigger on every loop
+        asm volatile("" ::: "memory");
+      }
+      for (volatile auto module : modules) {
+        module->core1_update();
+      }
+    }
+  }
+}
+
+// Just some checks to make sure the arrays are not changed
+static_assert(sizeof(command_buffer) == 30,
+              "Command buffer size is not 30 bytes");
+static_assert(command_table[3].command_func == &pwm_write,
+              "Command table is not correct");
+static_assert(command_table[38].command_func == &reset_to_bootloader,
+              "Command table is not correct");
+static_assert(command_table[33].command_func == &module_new,
+              "Command table is not correct");
+static_assert(command_table[27].command_func == &set_format_spi,
+              "Command table is not correct");

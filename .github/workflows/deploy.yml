@@ -18,13 +18,26 @@ jobs:
         name: Build and deploy
         container: ghcr.io/arendjan/pico_docker_image:main
         steps:
-          - uses: actions/checkout@v4
+          - uses: actions/checkout@main
+            with:
+              submodules: true
           - name: build
             run: |
               chmod +x build.sh
               ./build.sh
           - name: Copy uf2 file
-            run: cp ./build2/Telemetrix4RpiPico.uf2 ./
+            run: |
+              cp ./build2/Telemetrix4RpiPico.uf2 ./
+              cp ./build2/Telemetrix4RpiPico.elf ./
+          - name: install nodejs
+            run: |
+                apt update
+                apt install curl unzip -y
+                curl -fsSL https://deb.nodesource.com/setup_20.x -o nodesource_setup.sh
+                chmod +x nodesource_setup.sh
+                ./nodesource_setup.sh
+                apt-get install -y nodejs
+                node -v
           - name: Put environment variable into the env context
             run: echo "app_name=$APP_NAME" >> $GITHUB_ENV
           - name: Archive production artifacts
@@ -33,9 +46,47 @@ jobs:
               name: dist
               path: |
                 Telemetrix4RpiPico.uf2
-            
+                Telemetrix4RpiPico.elf
           - name: Push to release
             uses: softprops/action-gh-release@v2
             if: startsWith(github.ref, 'refs/tags/')
             with:
-                files: Telemetrix4RpiPico.uf2
+                files: |
+                  Telemetrix4RpiPico.uf2
+                  Telemetrix4RpiPico.elf
+                generate_release_notes: true
+          - name: Check if mirte-sd-image-tools has release with same tag
+            id: check_release
+            if: startsWith(github.ref, 'refs/tags/')
+            uses: actions/github-script@v8
+            with:
+              script: |
+                const tag = process.env.GITHUB_REF.replace('refs/tags/', '');
+                try {
+                  const release = await github.rest.repos.getReleaseByTag({
+                  owner: context.repo.owner,
+                  repo: 'mirte-sd-image-tools',
+                  tag: tag,
+                  });
+                  console.log("true");
+                  return true;
+                } catch (error) {
+                  console.log(error);
+                  if (error.status === 404) {
+                  return false;
+                  } else {
+                  throw error;
+                  }
+                }
+              result-encoding: string
+          - name: Push artifacts to sd-image-tools release if it exists
+            if: startsWith(github.ref, 'refs/tags/') && steps.check_release.outputs.result == 'true' 
+            uses: softprops/action-gh-release@v2
+            with:
+              repository: ${{ github.repository_owner }}/mirte-sd-image-tools
+              files: |
+                Telemetrix4RpiPico.uf2
+                Telemetrix4RpiPico.elf
+              generate_release_notes: false
+              tag_name: ${{ github.ref_name }}
+              token: ${{ secrets.RELEASE_TOKEN }} # needs contents permission on mirte-sd-image-tools 
