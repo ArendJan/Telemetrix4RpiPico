@@ -29,6 +29,7 @@
  *************************************************************************/
 #include "module/Hiwonder_Servo.hpp"
 #include "module/PCA9685_Module.hpp"
+#include "module/Shutdown_Module.hpp"
 #include "module/tmx_ssd1306_Module.hpp"
 
 #include "drivers/neopixel.hpp"
@@ -315,12 +316,21 @@ void pwm_write() {
   auto data = std::span(command_buffer);
   uint pin;
   uint16_t value;
+  auto msg_count = (packet_size - 1) / 3;
+  for (int i = 0; i < msg_count; i++) {
+    auto offset = i * 3;
+    pin = command_buffer[offset + PWM_WRITE_GPIO_PIN];
 
-  pin = command_buffer[PWM_WRITE_GPIO_PIN];
-
-  value =
-      decode_u16(data.subspan<SET_PIN_MODE_PWM_HIGH_VALUE, sizeof(uint16_t)>());
-  pwm_set_gpio_level(pin, value);
+    value = decode_u16(std::span<uint8_t, sizeof(uint16_t)>(
+        data.data() + offset + SET_PIN_MODE_PWM_HIGH_VALUE, sizeof(uint16_t)));
+    if (value == 0 || value == top) {
+      // for the common case of fully on or off, just set the pin level to avoid
+      // any issues with the wrap around
+      gpio_put(pin, value == top);
+      continue;
+    }
+    pwm_set_gpio_level(pin, value);
+  }
 }
 
 /***************************************************
@@ -1190,8 +1200,10 @@ void module_new() {
            [](std::vector<uint8_t> &data) { return new PCA9685_Module(data); }},
           {MODULE_TYPES::HIWONDER_SERVO,
            [](std::vector<uint8_t> &data) { return new Hiwonder_Servo(data); }},
-          // {MODULE_TYPES::SHUTDOWN_RELAY, [](const std::vector<uint8_t>& data)
-          // { return nullptr; /* not implemented */ }},
+          {MODULE_TYPES::SHUTDOWN_RELAY,
+           [](std::vector<uint8_t> &data) {
+             return new Shutdown_Relay(data); /* not implemented */
+           }},
           {MODULE_TYPES::TMX_SSD1306,
            [](std::vector<uint8_t> &data) { return new TmxSSD1306(data); }},
       };
@@ -1257,17 +1269,6 @@ void module_data() {
   modules[module_num]->writeModule(data);
 }
 
-// Shutdown_Relay::Shutdown_Relay(std::vector<uint8_t> &data) {
-//   this->pin = data[0];
-//   this->enable_on = data[1];
-//   this->wait_time = data[2]; // seconds
-//   gpio_init(this->pin);
-//   gpio_set_dir(this->pin, GPIO_OUT);
-//   gpio_put(this->pin, !this->enable_on);
-//   this->start_time = time_us_32();
-//   this->enabled = false;
-// }
-
 bool watchdog_enable_shutdown = true; // if false, then don't do anything with
                                       // the watchdog and just wait for shutdown
 
@@ -1280,38 +1281,6 @@ void enable_watchdog() {
                   1); // Add watchdog again requiring trigger every 5s
   watchdog_update();
 }
-
-// void Shutdown_Relay::readModule() {
-//   if (this->enabled) {
-//     if (time_us_32() - this->start_time > (this->wait_time * 1'000'000)) {
-//       gpio_put(this->pin, this->enable_on);
-//       // relay will be turned off and power will be cut
-
-//       // enable watchdog and wait for reset when the relay is not connected
-//       or
-//       // not working. Don't want the pico to be stuck
-//       enable_watchdog();
-//       while (true) {
-//         led_debug(100, 100);
-//       }
-//     }
-//   }
-// }
-
-// void Shutdown_Relay::writeModule(std::vector<uint8_t> &data) {
-//   if (data[0] == 1) // trigger to start the countdown
-//   {
-//     this->start_time = time_us_32();
-//     this->enabled = true;
-//     disable_watchdog();
-//     watchdog_enable_shutdown = false; // dont let ping pet the watchdog
-//   } else {
-//     this->enabled = false;
-//     enable_watchdog();
-//     watchdog_enable_shutdown = true;
-//   }
-//   gpio_put(LED_PIN, this->enabled);
-// }
 
 /**********************ORIGINAL MODULES******************************/
 

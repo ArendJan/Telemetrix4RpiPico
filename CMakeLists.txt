@@ -53,6 +53,7 @@ add_executable(
   src/module/PCA9685_Module.cpp
   src/module/module.cpp
   src/module/tmx_ssd1306_Module.cpp
+  src/module/Shutdown_Module.cpp
   src/sensors/adxl345_sensor.cpp
   src/sensors/gps_sensor.cpp
   src/sensors/hmc5883l_sensor.cpp

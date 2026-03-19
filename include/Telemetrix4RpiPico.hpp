@@ -183,21 +183,7 @@ void readSensors();
 extern std::vector<Sensor *> sensors;
 void reportBytes(std::vector<uint8_t>);
 extern uint8_t command_buffer[MAX_COMMAND_LENGTH];
-// class Shutdown_Relay : public Module {
-// public:
-//   Shutdown_Relay(std::vector<uint8_t> &data);
-//   void readModule();
-//   void writeModule(std::vector<uint8_t> &data);
-//   void resetModule(){};
-
-// private:
-//   int pin = 0;
-//   bool enabled = false;
-//   bool enable_on = true;
-//   int wait_time = 10;
-//   decltype(time_us_32()) start_time = 0;
-// };
-
+extern int packet_size;
 extern std::vector<Module *> modules;
 void module_new();
 void module_data();

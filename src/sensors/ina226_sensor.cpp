@@ -15,7 +15,7 @@ INA226_Sensor::INA226_Sensor(uint8_t sensor_data[SENSORS_MAX_SETTINGS_A]) {
     this->stop = true;
     return;
   }
-  this->sensor->setResistorRange(0.010, 8.3);
+  this->sensor->setResistorRange(0.005, 8.3);
   // this->sensor.av
   this->sensor->setAverage(INA226_AVERAGES::AVERAGE_256);
   this->sensor->setMeasureMode(INA226_MEASURE_MODE::CONTINUOUS);

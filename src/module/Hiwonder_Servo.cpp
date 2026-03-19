@@ -316,7 +316,7 @@ void Hiwonder_Servo::core1_update() {
   //   return;
   // }
   // send_debug_info_dis(31, 100);
-  gpio_put(LED_PIN, !gpio_get(LED_PIN)); // toggle the led state
+  // gpio_put(LED_PIN, !gpio_get(LED_PIN)); // toggle the led state
   if (this->enabled_servos == 0) {
     // send_debug_info(30, 0);
     return;
