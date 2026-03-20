@@ -323,11 +323,15 @@ void pwm_write() {
 
     value = decode_u16(std::span<uint8_t, sizeof(uint16_t)>(
         data.data() + offset + SET_PIN_MODE_PWM_HIGH_VALUE, sizeof(uint16_t)));
-    if (value == 0 || value == top) {
+    if (value == 0 || value >= top) {
       // for the common case of fully on or off, just set the pin level to avoid
       // any issues with the wrap around
-      gpio_put(pin, value == top);
-      continue;
+      if (the_digital_pins[pin].pin_mode != PIN_MODES::PWM) {
+        // if pwm, then still fall thru to normal pwm mode, otherwise (digital),
+        // then write like digital.
+        gpio_put(pin, value >= top);
+        continue;
+      }
     }
     pwm_set_gpio_level(pin, value);
   }
