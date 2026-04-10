@@ -38,6 +38,7 @@ set(PICO_USE_FASTEST_SUPPORTED_CLOCK 100)
 add_executable(
   Telemetrix4RpiPico
   src/Telemetrix4RpiPico.cpp
+  src/mirte_master.cpp
   src/i2c_helpers.cpp
   src/uart.cpp
   src/serialization.cpp

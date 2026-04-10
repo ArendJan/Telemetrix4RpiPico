@@ -44,6 +44,7 @@
 #include "sensors/vl53l0x_sensor.hpp"
 
 #include "Telemetrix4RpiPico.hpp"
+#include "mirte_master.hpp"
 #include "sensors/sonar.hpp"
 #include "serialization.hpp"
 #include <functional>
@@ -1484,52 +1485,6 @@ void feature_detect() {
   serial_write(id_msg);
 }
 
-bool check_usb_connection() {
-  // Read in VBUS pin
-  // NOTE: this does not work with a pico W, as the VBUS pin is connected to the
-  // Wifi chip
-  auto const USB_VBUS_PIN = 24;
-  return gpio_get(USB_VBUS_PIN);
-}
-#define MIRTE_MASTER 1
-#if MIRTE_MASTER
-#define DISABLE_USB_CHECK 1
-void check_mirte_master() {
-#if DISABLE_USB_CHECK
-  return;
-#endif
-  if (uart_enabled) {
-    // Not a mirte master pcb (with tied uart pins)
-    return;
-  }
-  auto usb = check_usb_connection();
-  // gpio_put(LED_PIN, usb);
-  // Assume the pico is put on a mirte-master pcb
-  // when the pc is shut down, but did not inform the pico for the relay, then
-  // the power will stay on check usb connection, if not connected, then turn
-  // off the relay
-  static auto start_time = 0;
-  if (!usb) {
-    if (start_time == 0) {
-      start_time = time_us_32();
-    }
-    if (time_us_32() - start_time >
-        100'000'000) { // Wait 100s for a usb connection
-      const auto relay_pin = 27;
-      gpio_init(relay_pin);
-      gpio_set_dir(relay_pin, GPIO_OUT);
-      gpio_put(relay_pin, 1);
-      enable_watchdog();
-      while (1) {
-        led_debug(10, 200);
-      }
-    }
-  } else {
-    start_time = 0;
-  }
-}
-#endif
-
 std::vector<Sensor *> sensors;
 std::vector<Module *> modules;
 
@@ -1555,6 +1510,7 @@ int main() {
   //                        // don't want to use it
   led_debug(5, 100);
   adc_init();
+  mm_detect();
   // create an array of pin_descriptors for 100 pins
   // establish the digital pin array
   for (uint8_t i = 0; i < MAX_DIGITAL_PINS_SUPPORTED; i++) {
@@ -1604,10 +1560,7 @@ int main() {
         scan_dhts();
         scan_encoders();
         readSensors();
-#if MIRTE_MASTER
-        check_mirte_master(); // Not needed anymore, as relay and transistors
-                              // are broken
-#endif
+        mm_loop();
         if (watchdog_enabled) {
           check_wd_timeout();
         }
