@@ -2,10 +2,11 @@
 // #include "Telemetrix4RpiPico.hpp"
 #include "hardware/watchdog.h"
 const uint LED_PIN = 25; // board LED
-
+bool check_usb_connection();
 void Shutdown_Relay::readModule() {
   if (this->enabled) {
-    if (time_us_32() - this->start_time > (this->wait_time * 1'000'000)) {
+    if (time_us_32() - this->start_time > (this->wait_time * 1'000'000) ||
+        !check_usb_connection()) {
       gpio_put(this->pin, this->enable_on);
       // relay will be turned off and power will be cut
 

@@ -67,11 +67,15 @@ void init_mm_button_hold() {
 }
 
 const auto button_hold_value =
-    0; // The value read from the button pin when the button is held
+    1; // The value read from the button pin when the button is held
+
 void detect_mm_button_hold() {
   const auto button_pin = 27;
   static decltype(time_us_32()) button_hold_start_time = 0;
-  if (gpio_get(button_pin) == button_hold_value) {
+  static bool button_released_start = false;
+
+  bool button_held = gpio_get(button_pin) == button_hold_value;
+  if (button_held && button_released_start) {
     if (button_hold_start_time == 0) {
       button_hold_start_time = time_us_32();
     }
@@ -80,8 +84,16 @@ void detect_mm_button_hold() {
     }
   } else {
     button_hold_start_time = 0;
+    if (button_held) {
+      // The button is currently held, but we haven't detected a hold yet, so
+      // do nothing until it's released and held again
+    } else {
+      // The button is currently not held, so we can start detecting for a hold
+      // after it's pressed again
+      button_released_start = true;
+    }
   }
-  gpio_put(25, gpio_get(button_pin));
+  gpio_put(25, check_usb_connection());
 }
 
 void mm_detect() {
