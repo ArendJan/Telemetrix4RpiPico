@@ -50,8 +50,10 @@ add_executable(
   src/drivers/INA226v2.cpp
   src/drivers/VL53L0.cpp
   src/drivers/neopixel.cpp
+  src/drivers/MPU6050.cpp
   src/module/Hiwonder_Servo.cpp
   src/module/PCA9685_Module.cpp
+  src/sensors/MPU6050_sensor.cpp
   src/module/module.cpp
   src/module/tmx_ssd1306_Module.cpp
   src/module/Shutdown_Module.cpp

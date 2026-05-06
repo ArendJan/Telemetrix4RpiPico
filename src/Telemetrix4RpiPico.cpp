@@ -33,6 +33,7 @@
 #include "module/tmx_ssd1306_Module.hpp"
 
 #include "drivers/neopixel.hpp"
+#include "sensors/MPU6050_sensor.hpp"
 #include "sensors/adxl345_sensor.hpp"
 #include "sensors/as5600_sensor.hpp"
 #include "sensors/gps_sensor.hpp"
@@ -1136,6 +1137,10 @@ auto sensor_funcs = std::vector<std::pair<
     {SENSOR_TYPES::AS5600_t,
      [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
        return new AS5600_Sensor(data);
+     }},
+    {SENSOR_TYPES::MPU6050_t,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new MPU6050_Module(data);
      }},
 };
 
