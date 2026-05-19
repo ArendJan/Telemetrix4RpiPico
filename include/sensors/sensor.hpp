@@ -18,6 +18,7 @@ enum SENSOR_TYPES : uint8_t { // Max 255 sensors, but will always fit in a
   HMC5883l = 7,
   AS5600_t = 8,
   MPU6050_t = 9,
+  BNO055_t = 10,
   MAX_SENSORS
 };
 

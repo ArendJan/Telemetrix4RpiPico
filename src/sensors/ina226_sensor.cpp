@@ -3,6 +3,7 @@
 #include "pico/time.h"
 
 #include "Telemetrix4RpiPico.hpp"
+#include "serialization.hpp"
 
 INA226_Sensor::INA226_Sensor(uint8_t sensor_data[SENSORS_MAX_SETTINGS_A]) {
   auto port = sensor_data[0];
@@ -41,6 +42,12 @@ void INA226_Sensor::readSensor() {
   const unsigned char *bytes =
       reinterpret_cast<const uint8_t *>(&float_data[0]);
   static_assert(sizeof(float) == 4);
-  std::vector<uint8_t> data(bytes, bytes + sizeof(float) * float_data.size());
+  std::vector<uint8_t> data;
+  data.reserve(float_data.size() * sizeof(float));
+  for (size_t i = 0; i < float_data.size(); i++) {
+    auto enc = encode_float(float_data[i]);
+    data.insert(data.end(), enc.begin(), enc.end());
+  }
+
   this->writeSensorData(data);
 }

@@ -64,6 +64,7 @@ add_executable(
   src/sensors/as5600_sensor.cpp
   src/sensors/ina226_sensor.cpp
   src/sensors/mpu9250_sensor.cpp
+  src/sensors/bno055_sensor.cpp
   src/sensors/sensor.cpp
   src/sensors/sonar.cpp
   src/sensors/veml6040_sensor.cpp
@@ -89,7 +90,7 @@ pico_enable_stdio_uart(Telemetrix4RpiPico 1) # TODO: For master version this
                                              # must be disabled
 pico_add_extra_outputs(Telemetrix4RpiPico)
 add_subdirectory(pico-ssd1306)
-
+add_subdirectory(libs/MIRTE_Adafruit_BNO055)
 target_link_libraries(
   Telemetrix4RpiPico
   pico_stdlib
@@ -105,7 +106,8 @@ target_link_libraries(
   hardware_flash
   pico_sync
   pico_multicore
-  pico_ssd1306)
+  pico_ssd1306
+  Adafruit_BNO055)
 
 set(SKIP_BOOTLOADER_ENTRY_PIN 1)
 add_subdirectory(rp2040-serial-bootloader)

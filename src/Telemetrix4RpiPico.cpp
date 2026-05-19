@@ -43,6 +43,7 @@
 #include "sensors/mpu9250_sensor.hpp"
 #include "sensors/veml6040_sensor.hpp"
 #include "sensors/vl53l0x_sensor.hpp"
+#include "sensors/bno055_sensor.hpp"
 
 #include "Telemetrix4RpiPico.hpp"
 #include "mirte_master.hpp"
@@ -1141,6 +1142,10 @@ auto sensor_funcs = std::vector<std::pair<
     {SENSOR_TYPES::MPU6050_t,
      [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
        return new MPU6050_Module(data);
+     }},
+     {SENSOR_TYPES::BNO055_t,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new BNO055_Sensor(data);
      }},
 };
 
