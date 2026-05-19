@@ -34,4 +34,3 @@ uint32_t millis();
 int reset_i2c(uint32_t scl_gpio, uint32_t sda_gpio, uint32_t port);
 
 bool check_addr(int i2c_port, int addr);
-
