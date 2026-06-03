@@ -630,22 +630,24 @@ void reset_neo_pixels() {
   np.clear();
 }
 
-void init_quadrature_encoder(int A, int B, encoder_t *enc) {
+void init_quadrature_encoder(int A, int B, encoder_t *enc, bool pullup = false,
+                             bool pulldown = false) {
   gpio_init(A);
   gpio_set_dir(A, GPIO_IN);
-  gpio_set_pulls(A, false, false);
+  gpio_set_pulls(A, pullup, pulldown);
   gpio_init(B);
   gpio_set_dir(B, GPIO_IN);
-  gpio_set_pulls(B, false, false);
+  gpio_set_pulls(B, pullup, pulldown);
 
   enc->A = A;
   enc->B = B;
   enc->type = QUADRATURE;
 }
-void init_single_encoder(int A, encoder_t *enc) {
+void init_single_encoder(int A, encoder_t *enc, bool pullup = false,
+                         bool pulldown = false) {
   gpio_init(A);
   gpio_set_dir(A, GPIO_IN);
-  gpio_set_pulls(A, false, false);
+  gpio_set_pulls(A, pullup, pulldown);
 
   enc->A = A;
   enc->type = SINGLE;
@@ -717,6 +719,9 @@ void encoder_new() {
   ENCODER_TYPES type = (ENCODER_TYPES)command_buffer[ENCODER_TYPE];
   uint pin_a = command_buffer[ENCODER_PIN_A];
   uint pin_b = command_buffer[ENCODER_PIN_B]; // both cases will have a pin B
+  // set to 1 if pullup, 2 if pulldown, 0 if nothing.
+  auto pulls = command_buffer[ENCODER_PULLS];
+
   if (encoders.next_encoder_index == 0) {
     mutex_init(&encoders.mutex);
     bool timer = create_encoder_timer();
@@ -730,9 +735,9 @@ void encoder_new() {
 
   encoder_t *new_encoder = &encoders.encoders[encoders.next_encoder_index];
   if (type == SINGLE) {
-    init_single_encoder(pin_a, new_encoder);
+    init_single_encoder(pin_a, new_encoder, pulls & 1, pulls & 2);
   } else {
-    init_quadrature_encoder(pin_a, pin_b, new_encoder);
+    init_quadrature_encoder(pin_a, pin_b, new_encoder, pulls & 1, pulls & 2);
   }
   encoders.next_encoder_index++;
   mutex_exit(&encoders.mutex);
@@ -942,52 +947,116 @@ void servo_detach() {
 /***************************************************
  * Retrieve the next command and process it
  */
+
+// rewrite of get_next_command without any waiting states, use command buffer
+// and index to read into buffer until packet size bytes are received
+
+int curr_packet_index = -1;
 int packet_size; // to get the size of the packets in module_new
+auto last_cmd_byte = time_us_32();
 void get_next_command() {
-  int packet_data;
-  command_descriptor command_entry;
-
-  // clear the command buffer for the new incoming command
-  memset(command_buffer, 0, sizeof(command_buffer));
-
-  // Get the number of bytes of the command packet.
-  // The first byte is the command ID and the following bytes
-  // are the associated data bytes
-  packet_size = get_byte();
-  if (packet_size == PICO_ERROR_TIMEOUT) {
-    // no data, let the main loop continue to run to handle inputs
-    return;
-  } else {
-    gpio_put(LED_PIN, !gpio_get(LED_PIN)); // toggle the led state
-    // get the rest of the packet
-    for (int i = 0; i < packet_size; i++) {
-      for (int retries = 10; retries > 0; retries--) {
-        packet_data = get_byte();
-
-        if (packet_data != PICO_ERROR_TIMEOUT) {
-          break;
-        }
-        sleep_ms(1);
-      }
-      if (packet_data == PICO_ERROR_TIMEOUT) {
-        return; // failed message
-      }
-      command_buffer[i] = (uint8_t)packet_data;
+  if (uart_get_hw(UART_ID)->fr & UART_UARTFR_RXFF_BITS) {
+    send_debug_info(66, 66);
+  }
+  auto byte = stdio_getchar_timeout_us(0);
+  if (byte == PICO_ERROR_TIMEOUT || byte > 255) {
+    if (curr_packet_index != -1 && time_us_32() - last_cmd_byte > 100000) {
+      // if it's been more than 100ms since the last byte, then reset the packet
+      // index to start fresh
+      curr_packet_index = -1;
+      last_cmd_byte = time_us_32();
     }
 
-    // the first byte is the command ID.
-    // look up the function and execute it.
-    // data for the command starts at index 1 in the command_buffer
+    return;
+  }
+  last_cmd_byte = time_us_32();
+  if (curr_packet_index == -1) {
+    // received packet size part of the message
+
+    if (byte > MAX_COMMAND_LENGTH || byte == 0) {
+      return;
+    }
+    packet_size = byte;
+    gpio_put(LED_PIN,
+             !gpio_get(LED_PIN)); // toggle the led state for every packet
+
+  } else {
+    // data part of the message
+    command_buffer[curr_packet_index] = (uint8_t)byte;
+  }
+
+  curr_packet_index++; // next byte of the message for next loop
+  if (packet_size == curr_packet_index) {
+
+    command_descriptor command_entry;
     command_entry = command_table[command_buffer[0]];
-
-    // uncomment to see the command and first byte of data
-    // send_debug_info(command_buffer[0], command_buffer[1]);
-
-    // call the command
-
     command_entry.command_func();
+
+    // reset everything
+    packet_size = 0;
+    curr_packet_index = -1;
+  }
+  if (curr_packet_index > packet_size) {
+    curr_packet_index = -1;
   }
 }
+
+// // int packet_size; // to get the size of the packets in module_new
+// void get_next_command_old() {
+//   int packet_data;
+//   command_descriptor command_entry;
+
+//   // clear the command buffer for the new incoming command
+//   // memset(command_buffer, 0, sizeof(command_buffer));
+//   if(uart_get_hw(UART_ID)->fr&UART_UARTFR_RXFF_BITS) {
+//     send_debug_info(66,66);
+//   }
+
+//   // Get the number of bytes of the command packet.
+//   // The first byte is the command ID and the following bytes
+//   // are the associated data bytes
+//   packet_size = get_byte();
+//   if(packet_size > MAX_COMMAND_LENGTH) {
+//     // if the packet size is larger than the max command size, then we have a
+//     problem
+//     // with the data and should just return and wait for the next command
+//     return;
+//   }
+//   if (packet_size == PICO_ERROR_TIMEOUT) {
+//     // no data, let the main loop continue to run to handle inputs
+//     return;
+//   } else {
+//     // get the rest of the packet
+//     for (int i = 0; i < packet_size; i++) {
+//       for (int retries = 10; retries > 0; retries--) {
+//         packet_data = get_byte();
+
+//         if (packet_data != PICO_ERROR_TIMEOUT) {
+//           break;
+//         }
+//         sleep_ms(1);
+//             gpio_put(LED_PIN, !gpio_get(LED_PIN)); // toggle the led state
+
+//       }
+//       if (packet_data == PICO_ERROR_TIMEOUT) {
+//         return; // failed message
+//       }
+//       command_buffer[i] = (uint8_t)packet_data;
+//     }
+
+//     // the first byte is the command ID.
+//     // look up the function and execute it.
+//     // data for the command starts at index 1 in the command_buffer
+//     command_entry = command_table[command_buffer[0]];
+
+//     // uncomment to see the command and first byte of data
+//     // send_debug_info(command_buffer[0], command_buffer[1]);
+
+//     // call the command
+
+//     command_entry.command_func();
+//   }
+// }
 
 /**************************************
  * Scan all pins set as digital inputs
@@ -1467,6 +1536,7 @@ void feature_detect() {
   case ENCODER_NEW:
     id_msg.push_back(MAX_ENCODERS);
     id_msg.push_back(2); // allow quad enc
+    id_msg.push_back(1); // allow pullup/downs
     break;
   case SET_PIN_MODE:
     id_msg.push_back(MAX_DIGITAL_PINS_SUPPORTED);
