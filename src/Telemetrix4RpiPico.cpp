@@ -955,9 +955,6 @@ int curr_packet_index = -1;
 int packet_size; // to get the size of the packets in module_new
 auto last_cmd_byte = time_us_32();
 void get_next_command() {
-  if (uart_get_hw(UART_ID)->fr & UART_UARTFR_RXFF_BITS) {
-    send_debug_info(66, 66);
-  }
   auto byte = stdio_getchar_timeout_us(0);
   if (byte == PICO_ERROR_TIMEOUT || byte > 255) {
     if (curr_packet_index != -1 && time_us_32() - last_cmd_byte > 100000) {
