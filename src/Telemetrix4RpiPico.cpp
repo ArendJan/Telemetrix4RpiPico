@@ -29,11 +29,14 @@
  *************************************************************************/
 #include "module/Hiwonder_Servo.hpp"
 #include "module/PCA9685_Module.hpp"
+#include "module/Shutdown_Module.hpp"
 #include "module/tmx_ssd1306_Module.hpp"
 
 #include "drivers/neopixel.hpp"
+#include "sensors/MPU6050_sensor.hpp"
 #include "sensors/adxl345_sensor.hpp"
 #include "sensors/as5600_sensor.hpp"
+#include "sensors/bno055_sensor.hpp"
 #include "sensors/gps_sensor.hpp"
 #include "sensors/hmc5883l_sensor.hpp"
 #include "sensors/hx711_sensor.hpp"
@@ -43,6 +46,7 @@
 #include "sensors/vl53l0x_sensor.hpp"
 
 #include "Telemetrix4RpiPico.hpp"
+#include "mirte_master.hpp"
 #include "sensors/sonar.hpp"
 #include "serialization.hpp"
 #include <functional>
@@ -315,12 +319,25 @@ void pwm_write() {
   auto data = std::span(command_buffer);
   uint pin;
   uint16_t value;
+  auto msg_count = (packet_size - 1) / 3;
+  for (int i = 0; i < msg_count; i++) {
+    auto offset = i * 3;
+    pin = command_buffer[offset + PWM_WRITE_GPIO_PIN];
 
-  pin = command_buffer[PWM_WRITE_GPIO_PIN];
-
-  value =
-      decode_u16(data.subspan<SET_PIN_MODE_PWM_HIGH_VALUE, sizeof(uint16_t)>());
-  pwm_set_gpio_level(pin, value);
+    value = decode_u16(std::span<uint8_t, sizeof(uint16_t)>(
+        data.data() + offset + SET_PIN_MODE_PWM_HIGH_VALUE, sizeof(uint16_t)));
+    if (value == 0 || value >= top) {
+      // for the common case of fully on or off, just set the pin level to avoid
+      // any issues with the wrap around
+      if (the_digital_pins[pin].pin_mode != PIN_MODES::PWM) {
+        // if pwm, then still fall thru to normal pwm mode, otherwise (digital),
+        // then write like digital.
+        gpio_put(pin, value >= top);
+        continue;
+      }
+    }
+    pwm_set_gpio_level(pin, value);
+  }
 }
 
 /***************************************************
@@ -613,22 +630,24 @@ void reset_neo_pixels() {
   np.clear();
 }
 
-void init_quadrature_encoder(int A, int B, encoder_t *enc) {
+void init_quadrature_encoder(int A, int B, encoder_t *enc, bool pullup = false,
+                             bool pulldown = false) {
   gpio_init(A);
   gpio_set_dir(A, GPIO_IN);
-  gpio_set_pulls(A, false, false);
+  gpio_set_pulls(A, pullup, pulldown);
   gpio_init(B);
   gpio_set_dir(B, GPIO_IN);
-  gpio_set_pulls(B, false, false);
+  gpio_set_pulls(B, pullup, pulldown);
 
   enc->A = A;
   enc->B = B;
   enc->type = QUADRATURE;
 }
-void init_single_encoder(int A, encoder_t *enc) {
+void init_single_encoder(int A, encoder_t *enc, bool pullup = false,
+                         bool pulldown = false) {
   gpio_init(A);
   gpio_set_dir(A, GPIO_IN);
-  gpio_set_pulls(A, false, false);
+  gpio_set_pulls(A, pullup, pulldown);
 
   enc->A = A;
   enc->type = SINGLE;
@@ -700,6 +719,9 @@ void encoder_new() {
   ENCODER_TYPES type = (ENCODER_TYPES)command_buffer[ENCODER_TYPE];
   uint pin_a = command_buffer[ENCODER_PIN_A];
   uint pin_b = command_buffer[ENCODER_PIN_B]; // both cases will have a pin B
+  // set to 1 if pullup, 2 if pulldown, 0 if nothing.
+  auto pulls = command_buffer[ENCODER_PULLS];
+
   if (encoders.next_encoder_index == 0) {
     mutex_init(&encoders.mutex);
     bool timer = create_encoder_timer();
@@ -713,9 +735,9 @@ void encoder_new() {
 
   encoder_t *new_encoder = &encoders.encoders[encoders.next_encoder_index];
   if (type == SINGLE) {
-    init_single_encoder(pin_a, new_encoder);
+    init_single_encoder(pin_a, new_encoder, pulls & 1, pulls & 2);
   } else {
-    init_quadrature_encoder(pin_a, pin_b, new_encoder);
+    init_quadrature_encoder(pin_a, pin_b, new_encoder, pulls & 1, pulls & 2);
   }
   encoders.next_encoder_index++;
   mutex_exit(&encoders.mutex);
@@ -925,52 +947,113 @@ void servo_detach() {
 /***************************************************
  * Retrieve the next command and process it
  */
+
+// rewrite of get_next_command without any waiting states, use command buffer
+// and index to read into buffer until packet size bytes are received
+
+int curr_packet_index = -1;
 int packet_size; // to get the size of the packets in module_new
+auto last_cmd_byte = time_us_32();
 void get_next_command() {
-  int packet_data;
-  command_descriptor command_entry;
-
-  // clear the command buffer for the new incoming command
-  memset(command_buffer, 0, sizeof(command_buffer));
-
-  // Get the number of bytes of the command packet.
-  // The first byte is the command ID and the following bytes
-  // are the associated data bytes
-  packet_size = get_byte();
-  if (packet_size == PICO_ERROR_TIMEOUT) {
-    // no data, let the main loop continue to run to handle inputs
-    return;
-  } else {
-    gpio_put(LED_PIN, !gpio_get(LED_PIN)); // toggle the led state
-    // get the rest of the packet
-    for (int i = 0; i < packet_size; i++) {
-      for (int retries = 10; retries > 0; retries--) {
-        packet_data = get_byte();
-
-        if (packet_data != PICO_ERROR_TIMEOUT) {
-          break;
-        }
-        sleep_ms(1);
-      }
-      if (packet_data == PICO_ERROR_TIMEOUT) {
-        return; // failed message
-      }
-      command_buffer[i] = (uint8_t)packet_data;
+  auto byte = stdio_getchar_timeout_us(0);
+  if (byte == PICO_ERROR_TIMEOUT || byte > 255) {
+    if (curr_packet_index != -1 && time_us_32() - last_cmd_byte > 100000) {
+      // if it's been more than 100ms since the last byte, then reset the packet
+      // index to start fresh
+      curr_packet_index = -1;
+      last_cmd_byte = time_us_32();
     }
 
-    // the first byte is the command ID.
-    // look up the function and execute it.
-    // data for the command starts at index 1 in the command_buffer
+    return;
+  }
+  last_cmd_byte = time_us_32();
+  if (curr_packet_index == -1) {
+    // received packet size part of the message
+
+    if (byte > MAX_COMMAND_LENGTH || byte == 0) {
+      return;
+    }
+    packet_size = byte;
+    gpio_put(LED_PIN,
+             !gpio_get(LED_PIN)); // toggle the led state for every packet
+
+  } else {
+    // data part of the message
+    command_buffer[curr_packet_index] = (uint8_t)byte;
+  }
+
+  curr_packet_index++; // next byte of the message for next loop
+  if (packet_size == curr_packet_index) {
+
+    command_descriptor command_entry;
     command_entry = command_table[command_buffer[0]];
-
-    // uncomment to see the command and first byte of data
-    // send_debug_info(command_buffer[0], command_buffer[1]);
-
-    // call the command
-
     command_entry.command_func();
+
+    // reset everything
+    packet_size = 0;
+    curr_packet_index = -1;
+  }
+  if (curr_packet_index > packet_size) {
+    curr_packet_index = -1;
   }
 }
+
+// // int packet_size; // to get the size of the packets in module_new
+// void get_next_command_old() {
+//   int packet_data;
+//   command_descriptor command_entry;
+
+//   // clear the command buffer for the new incoming command
+//   // memset(command_buffer, 0, sizeof(command_buffer));
+//   if(uart_get_hw(UART_ID)->fr&UART_UARTFR_RXFF_BITS) {
+//     send_debug_info(66,66);
+//   }
+
+//   // Get the number of bytes of the command packet.
+//   // The first byte is the command ID and the following bytes
+//   // are the associated data bytes
+//   packet_size = get_byte();
+//   if(packet_size > MAX_COMMAND_LENGTH) {
+//     // if the packet size is larger than the max command size, then we have a
+//     problem
+//     // with the data and should just return and wait for the next command
+//     return;
+//   }
+//   if (packet_size == PICO_ERROR_TIMEOUT) {
+//     // no data, let the main loop continue to run to handle inputs
+//     return;
+//   } else {
+//     // get the rest of the packet
+//     for (int i = 0; i < packet_size; i++) {
+//       for (int retries = 10; retries > 0; retries--) {
+//         packet_data = get_byte();
+
+//         if (packet_data != PICO_ERROR_TIMEOUT) {
+//           break;
+//         }
+//         sleep_ms(1);
+//             gpio_put(LED_PIN, !gpio_get(LED_PIN)); // toggle the led state
+
+//       }
+//       if (packet_data == PICO_ERROR_TIMEOUT) {
+//         return; // failed message
+//       }
+//       command_buffer[i] = (uint8_t)packet_data;
+//     }
+
+//     // the first byte is the command ID.
+//     // look up the function and execute it.
+//     // data for the command starts at index 1 in the command_buffer
+//     command_entry = command_table[command_buffer[0]];
+
+//     // uncomment to see the command and first byte of data
+//     // send_debug_info(command_buffer[0], command_buffer[1]);
+
+//     // call the command
+
+//     command_entry.command_func();
+//   }
+// }
 
 /**************************************
  * Scan all pins set as digital inputs
@@ -1122,6 +1205,14 @@ auto sensor_funcs = std::vector<std::pair<
      [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
        return new AS5600_Sensor(data);
      }},
+    {SENSOR_TYPES::MPU6050_t,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new MPU6050_Module(data);
+     }},
+    {SENSOR_TYPES::BNO055_t,
+     [](uint8_t data[SENSORS_MAX_SETTINGS_A]) {
+       return new BNO055_Sensor(data);
+     }},
 };
 
 void sensor_new() {
@@ -1190,8 +1281,10 @@ void module_new() {
            [](std::vector<uint8_t> &data) { return new PCA9685_Module(data); }},
           {MODULE_TYPES::HIWONDER_SERVO,
            [](std::vector<uint8_t> &data) { return new Hiwonder_Servo(data); }},
-          // {MODULE_TYPES::SHUTDOWN_RELAY, [](const std::vector<uint8_t>& data)
-          // { return nullptr; /* not implemented */ }},
+          {MODULE_TYPES::SHUTDOWN_RELAY,
+           [](std::vector<uint8_t> &data) {
+             return new Shutdown_Relay(data); /* not implemented */
+           }},
           {MODULE_TYPES::TMX_SSD1306,
            [](std::vector<uint8_t> &data) { return new TmxSSD1306(data); }},
       };
@@ -1257,17 +1350,6 @@ void module_data() {
   modules[module_num]->writeModule(data);
 }
 
-// Shutdown_Relay::Shutdown_Relay(std::vector<uint8_t> &data) {
-//   this->pin = data[0];
-//   this->enable_on = data[1];
-//   this->wait_time = data[2]; // seconds
-//   gpio_init(this->pin);
-//   gpio_set_dir(this->pin, GPIO_OUT);
-//   gpio_put(this->pin, !this->enable_on);
-//   this->start_time = time_us_32();
-//   this->enabled = false;
-// }
-
 bool watchdog_enable_shutdown = true; // if false, then don't do anything with
                                       // the watchdog and just wait for shutdown
 
@@ -1280,38 +1362,6 @@ void enable_watchdog() {
                   1); // Add watchdog again requiring trigger every 5s
   watchdog_update();
 }
-
-// void Shutdown_Relay::readModule() {
-//   if (this->enabled) {
-//     if (time_us_32() - this->start_time > (this->wait_time * 1'000'000)) {
-//       gpio_put(this->pin, this->enable_on);
-//       // relay will be turned off and power will be cut
-
-//       // enable watchdog and wait for reset when the relay is not connected
-//       or
-//       // not working. Don't want the pico to be stuck
-//       enable_watchdog();
-//       while (true) {
-//         led_debug(100, 100);
-//       }
-//     }
-//   }
-// }
-
-// void Shutdown_Relay::writeModule(std::vector<uint8_t> &data) {
-//   if (data[0] == 1) // trigger to start the countdown
-//   {
-//     this->start_time = time_us_32();
-//     this->enabled = true;
-//     disable_watchdog();
-//     watchdog_enable_shutdown = false; // dont let ping pet the watchdog
-//   } else {
-//     this->enabled = false;
-//     enable_watchdog();
-//     watchdog_enable_shutdown = true;
-//   }
-//   gpio_put(LED_PIN, this->enabled);
-// }
 
 /**********************ORIGINAL MODULES******************************/
 
@@ -1483,6 +1533,7 @@ void feature_detect() {
   case ENCODER_NEW:
     id_msg.push_back(MAX_ENCODERS);
     id_msg.push_back(2); // allow quad enc
+    id_msg.push_back(1); // allow pullup/downs
     break;
   case SET_PIN_MODE:
     id_msg.push_back(MAX_DIGITAL_PINS_SUPPORTED);
@@ -1511,52 +1562,6 @@ void feature_detect() {
   serial_write(id_msg);
 }
 
-bool check_usb_connection() {
-  // Read in VBUS pin
-  // NOTE: this does not work with a pico W, as the VBUS pin is connected to the
-  // Wifi chip
-  auto const USB_VBUS_PIN = 24;
-  return gpio_get(USB_VBUS_PIN);
-}
-#define MIRTE_MASTER 1
-#if MIRTE_MASTER
-#define DISABLE_USB_CHECK 1
-void check_mirte_master() {
-#if DISABLE_USB_CHECK
-  return;
-#endif
-  if (uart_enabled) {
-    // Not a mirte master pcb (with tied uart pins)
-    return;
-  }
-  auto usb = check_usb_connection();
-  // gpio_put(LED_PIN, usb);
-  // Assume the pico is put on a mirte-master pcb
-  // when the pc is shut down, but did not inform the pico for the relay, then
-  // the power will stay on check usb connection, if not connected, then turn
-  // off the relay
-  static auto start_time = 0;
-  if (!usb) {
-    if (start_time == 0) {
-      start_time = time_us_32();
-    }
-    if (time_us_32() - start_time >
-        100'000'000) { // Wait 100s for a usb connection
-      const auto relay_pin = 27;
-      gpio_init(relay_pin);
-      gpio_set_dir(relay_pin, GPIO_OUT);
-      gpio_put(relay_pin, 1);
-      enable_watchdog();
-      while (1) {
-        led_debug(10, 200);
-      }
-    }
-  } else {
-    start_time = 0;
-  }
-}
-#endif
-
 std::vector<Sensor *> sensors;
 std::vector<Module *> modules;
 
@@ -1582,6 +1587,7 @@ int main() {
   //                        // don't want to use it
   led_debug(5, 100);
   adc_init();
+  mm_detect();
   // create an array of pin_descriptors for 100 pins
   // establish the digital pin array
   for (uint8_t i = 0; i < MAX_DIGITAL_PINS_SUPPORTED; i++) {
@@ -1631,10 +1637,7 @@ int main() {
         scan_dhts();
         scan_encoders();
         readSensors();
-#if MIRTE_MASTER
-        check_mirte_master(); // Not needed anymore, as relay and transistors
-                              // are broken
-#endif
+        mm_loop();
         if (watchdog_enabled) {
           check_wd_timeout();
         }

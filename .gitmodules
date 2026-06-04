@@ -4,3 +4,6 @@
 [submodule "rp2040-serial-bootloader"]
 	path = rp2040-serial-bootloader
 	url = https://github.com/arendjan/rp2040-serial-bootloader.git
+[submodule "libs/MIRTE_Adafruit_BNO055"]
+	path = libs/MIRTE_Adafruit_BNO055
+	url = https://github.com/ArendJan/MIRTE_Adafruit_BNO055.git

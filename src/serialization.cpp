@@ -1,6 +1,6 @@
 #include "serialization.hpp"
+#include <algorithm>
 #include <bit>
-
 std::vector<uint8_t> encode_u16(const uint16_t &value) {
   return {(uint8_t)(value >> 8), (uint8_t)(value & 0xFF)};
 }
@@ -32,9 +32,13 @@ std::vector<uint8_t> encode_i64(const int64_t &value) {
   return encode_u64(converted);
 }
 
-// std::vector<uint8_t> encode_float(const float & value) {
-//   return encode_u32(std::bit_cast<uint32_t>(value));
-// }
+std::vector<uint8_t> encode_float(const float &value) {
+  auto bytes = encode_u32(std::bit_cast<uint32_t>(value));
+  std::reverse(
+      bytes.begin(),
+      bytes.end()); // floats are undefined endian, other side expects this.
+  return bytes;
+}
 
 uint16_t decode_u16(const std::span<const uint8_t, 2> &data) {
   return ((uint16_t)data[0] << 8) | (uint16_t)data[1];

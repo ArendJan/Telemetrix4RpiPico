@@ -17,7 +17,7 @@ std::vector<uint8_t> encode_i16(const int16_t &value);
 std::vector<uint8_t> encode_i32(const int32_t &value);
 std::vector<uint8_t> encode_i64(const int64_t &value);
 
-// std::vector<uint8_t> encode_float(const float &value);
+std::vector<uint8_t> encode_float(const float &value);
 
 // Decode
 uint16_t decode_u16(const std::span<const uint8_t, 2> &data);

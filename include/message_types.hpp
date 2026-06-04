@@ -266,6 +266,7 @@ const uint DHT_MAX_TIMINGS = 85;
 #define ENCODER_TYPE 1
 #define ENCODER_PIN_A 2
 #define ENCODER_PIN_B 3
+#define ENCODER_PULLS 4
 
 // Max encoder devices
 #define MAX_ENCODERS 4
