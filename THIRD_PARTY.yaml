@@ -13,7 +13,7 @@ hx711:
 INA226_WE:
   - link: https://github.com/wollewald/INA226_WE
   - license: MIT
-lx16a-servo
+lx16a-servo:
   - link: https://github.com/madhephaestus/lx16a-servo
   - license: MIT
 mpu6050_i2c:
@@ -31,6 +31,6 @@ rp2040-serial-bootloader:
 TCA9548:
   - link: https://github.com/RobTillaart/TCA9548
   - license: MIT
-vl53l0x-arduino
+vl53l0x-arduino:
   - link: https://github.com/pololu/vl53l0x-arduino
   - license: MIT AND BSD-3-clause
