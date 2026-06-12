@@ -974,6 +974,9 @@ void get_next_command() {
       return;
     }
     packet_size = byte;
+    if (packet_size == 0) {
+      return;
+    }
     gpio_put(LED_PIN,
              !gpio_get(LED_PIN)); // toggle the led state for every packet
 
@@ -984,7 +987,12 @@ void get_next_command() {
 
   curr_packet_index++; // next byte of the message for next loop
   if (packet_size == curr_packet_index) {
-
+    if (curr_packet_index < 1) {
+      // if we have received a full packet, but the packet size is less than 1,
+      // then we have a problem with the data and should just return and wait
+      // for the next command
+      return;
+    }
     command_descriptor command_entry;
     command_entry = command_table[command_buffer[0]];
     command_entry.command_func();
