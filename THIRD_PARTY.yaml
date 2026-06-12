@@ -1,0 +1,36 @@
+Adafruit_BNO055:
+  - link: https://github.com/adafruit/Adafruit_BNO055
+  - license: MIT
+arduino-hmc5883l:
+  - link: https://github.com/jarzebski/arduino-hmc5883l
+  - license: GPL-3.0
+AS5600:
+  - link: https://github.com/RobTillaart/AS5600
+  - license: MIT
+hx711:
+  - link: https://github.com/bogde/hx711
+  - license: MIT
+INA226_WE:
+  - link: https://github.com/wollewald/INA226_WE
+  - license: MIT
+lx16a-servo:
+  - link: https://github.com/madhephaestus/lx16a-servo
+  - license: MIT
+mpu6050_i2c:
+  - link: https://github.com/raspberrypi/pico-examples/tree/master/i2c/mpu6050_i2c
+  - license: BSD-3-clause
+MPU9250:
+  - link: https://github.com/hideakitai/MPU9250
+  - license: MIT
+pico-ssd1306:
+  - link: https://github.com/Harbys/pico-ssd1306
+  - license: BSD-3-clause
+rp2040-serial-bootloader:
+  - link: https://github.com/usedbytes/rp2040-serial-bootloader
+  - license: BSD-3-clause
+TCA9548:
+  - link: https://github.com/RobTillaart/TCA9548
+  - license: MIT
+vl53l0x-arduino:
+  - link: https://github.com/pololu/vl53l0x-arduino
+  - license: MIT AND BSD-3-clause
