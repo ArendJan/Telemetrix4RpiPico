@@ -20,6 +20,7 @@ void serial_write(std::vector<uint8_t> data) {
   for (auto byte : data) {
     putchar_raw(byte);
   }
+  stdio_flush();
 }
 
 void put_byte(uint8_t byte) { putchar_raw(byte); }

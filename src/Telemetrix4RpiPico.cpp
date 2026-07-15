@@ -380,8 +380,10 @@ void modify_reporting() {
  * Retrieve the current firmware version
  */
 void get_firmware_version() {
-  serial_write(firmware_report_message,
-               sizeof(firmware_report_message) / sizeof(int));
+  std::vector<uint8_t> msg = {0, FIRMWARE_REPORT, FIRMWARE_MAJOR,
+                                 FIRMWARE_MINOR};
+
+  serial_write(msg);
 }
 
 /**************************************************************
@@ -956,8 +958,8 @@ int packet_size; // to get the size of the packets in module_new
 auto last_cmd_byte = time_us_32();
 void get_next_command() {
   auto byte = stdio_getchar_timeout_us(0);
-  if (byte == PICO_ERROR_TIMEOUT || byte > 255) {
-    if (curr_packet_index != -1 && time_us_32() - last_cmd_byte > 100000) {
+  if (byte == PICO_ERROR_TIMEOUT || byte > 255){
+    if (curr_packet_index != -1 && (time_us_32() - last_cmd_byte > 100'000)) {
       // if it's been more than 100ms since the last byte, then reset the packet
       // index to start fresh
       curr_packet_index = -1;
@@ -979,7 +981,6 @@ void get_next_command() {
     }
     gpio_put(LED_PIN,
              !gpio_get(LED_PIN)); // toggle the led state for every packet
-
   } else {
     // data part of the message
     command_buffer[curr_packet_index] = (uint8_t)byte;
@@ -993,6 +994,7 @@ void get_next_command() {
       // for the next command
       return;
     }
+
     command_descriptor command_entry;
     command_entry = command_table[command_buffer[0]];
     command_entry.command_func();
@@ -1583,7 +1585,8 @@ int main() {
   // gpio_put(14, 0);
   gpio_init(LED_PIN);
   gpio_set_dir(LED_PIN, GPIO_OUT);
-
+  // watchdog_hw->scratch[5] = 0;
+  // watchdog_hw->scratch[6] = 0;
   // stdio_init_all();
   stdio_usb_init();
   stdio_set_translate_crlf(&stdio_usb, false);

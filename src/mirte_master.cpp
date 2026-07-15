@@ -93,7 +93,7 @@ void detect_mm_button_hold() {
       button_released_start = true;
     }
   }
-  gpio_put(25, check_usb_connection());
+  // gpio_put(25, check_usb_connection());
 }
 
 void mm_detect() {
