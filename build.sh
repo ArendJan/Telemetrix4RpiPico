@@ -6,7 +6,7 @@ mkdir build2/ -p
 ls
 cd build2
 # Sometimes the debug build reports more errors than Release
-cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake -DCMAKE_BUILD_TYPE=Release -DPICOTOOL_FORCE_FETCH_FROM_GIT=ON .. 
 make -j
 cd ..
 # rm -rf build2
